@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.order import Order, OrderItem
 from app.schemas.order import OrderCreate
+from app.services.email_service import send_order_confirmation
 from app.services.pricing_service import calc_order_total, calc_total, calc_unit_price, get_pricing_config
 
 
@@ -70,4 +71,13 @@ async def create_order(db: AsyncSession, user_id: str, data: OrderCreate) -> Ord
 
     db.add(order)
     await db.flush()
+
+    # Send confirmation email — never blocks order creation if email fails
+    recipient_email = data.shipping.email
+    recipient_name = f"{data.shipping.first_name} {data.shipping.last_name}".strip()
+    try:
+        await send_order_confirmation(order, recipient_email, recipient_name)
+    except Exception:
+        pass  # email_service already logs the error
+
     return order
