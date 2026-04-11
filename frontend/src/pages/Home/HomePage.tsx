@@ -15,56 +15,6 @@ if (typeof document !== "undefined" && !document.getElementById("hp-fonts")) {
   document.head.appendChild(link);
 }
 
-// ── Animated floating card (used in other sections) ───────────────
-function _FloatingCard({
-  accent, delay, rotate, top, left, width, label, fields,
-}: {
-  accent: string; delay: number; rotate: number;
-  top: string; left: string; width: number; label: string;
-  fields: { h: number; w: number; y: number; x: number; type: "block" | "line" | "dot" }[];
-}) {
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 30, rotate: rotate - 4 }}
-      animate={{ opacity: 1, y: 0, rotate }}
-      transition={{ delay, duration: 0.9, ease: [0.22, 1, 0.36, 1] }}
-      style={{
-        position: "absolute",
-        top, left,
-        width,
-        height: width * 0.63,
-        background: "linear-gradient(135deg, #1a1f2e 0%, #0f1420 100%)",
-        borderRadius: 14,
-        border: `1px solid ${accent}33`,
-        boxShadow: `0 24px 64px rgba(0,0,0,0.6), 0 0 0 1px ${accent}22, inset 0 1px 0 rgba(255,255,255,0.04)`,
-        overflow: "hidden",
-        pointerEvents: "none",
-        backdropFilter: "blur(20px)",
-      }}
-    >
-      {/* Accent bar */}
-      <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 4, background: `linear-gradient(90deg, ${accent}, ${accent}88)` }} />
-      {/* Corner glow */}
-      <div style={{ position: "absolute", top: -20, right: -20, width: 80, height: 80, borderRadius: "50%", background: `${accent}18`, filter: "blur(20px)" }} />
-      {/* Label */}
-      <div style={{ position: "absolute", top: 14, left: 14, fontSize: 8, fontWeight: 700, color: accent, letterSpacing: 2, fontFamily: "'Bebas Neue', sans-serif", opacity: 0.9 }}>
-        {label}
-      </div>
-      {/* Fields */}
-      {fields.map((f, i) => (
-        <div key={i} style={{
-          position: "absolute",
-          top: `${f.y}%`, left: `${f.x}%`,
-          width: `${f.w}%`, height: f.type === "dot" ? 10 : f.h,
-          background: f.type === "block" ? `${accent}28` : f.type === "dot" ? accent : "rgba(255,255,255,0.08)",
-          borderRadius: f.type === "dot" ? "50%" : f.type === "block" ? 6 : 3,
-          border: f.type === "block" ? `1px solid ${accent}44` : "none",
-        }} />
-      ))}
-    </motion.div>
-  );
-}
-
 // ── Stat card ─────────────────────────────────────────────────────
 function StatPill({ value, label }: { value: string; label: string }) {
   return (
