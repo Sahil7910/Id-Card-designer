@@ -4,14 +4,10 @@ services:
     image: postgres:16-alpine
     restart: unless-stopped
     env_file: backend/.env.production
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      test: ["CMD-SHELL", "pg_isready -U idcard -d idcard_db"]
       interval: 5s
       timeout: 5s
       retries: 10
