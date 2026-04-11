@@ -3,6 +3,7 @@ import { useNavigate, Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { useAppDispatch, useAppSelector } from "../../app/hooks";
 import { authActions, selectIsAuthenticated, selectAuthUser } from "../../features/auth/authSlice";
+import HeroSection from "./HeroSection";
 
 // ── Google Fonts ───────────────────────────────────────────────────
 if (typeof document !== "undefined" && !document.getElementById("hp-fonts")) {
@@ -251,111 +252,10 @@ const HomePage = () => {
       <Navbar />
 
       {/* ── HERO ── */}
-      <section style={{ minHeight: "100vh", position: "relative", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", padding: "100px 40px 60px" }}>
-
-        {/* Gradient mesh bg */}
-        <div style={{ position: "absolute", inset: 0, background: "radial-gradient(ellipse 80% 60% at 50% 0%, #1a0a0022 0%, transparent 70%), radial-gradient(ellipse 60% 40% at 80% 80%, #0a1a3a44 0%, transparent 60%), radial-gradient(ellipse 50% 50% at 20% 60%, #e05c1a0a 0%, transparent 60%)", pointerEvents: "none" }} />
-
-        {/* Grid lines */}
-        <div style={{ position: "absolute", inset: 0, backgroundImage: "linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px)", backgroundSize: "60px 60px", pointerEvents: "none" }} />
-
-        {/* Floating ID cards */}
-        <FloatingCard accent="#e05c1a" delay={0.4} rotate={-8} top="12%" left="6%" width={200}
-          label="EMPLOYEE ID" fields={[
-            { type: "block", h: 42, w: 28, y: 28, x: 8 },
-            { type: "line",  h: 6,  w: 55, y: 28, x: 40 },
-            { type: "line",  h: 4,  w: 40, y: 44, x: 40 },
-            { type: "line",  h: 3,  w: 60, y: 72, x: 8 },
-            { type: "line",  h: 3,  w: 45, y: 82, x: 8 },
-          ]} />
-
-        <FloatingCard accent="#0ea5e9" delay={0.6} rotate={6} top="55%" left="2%" width={170}
-          label="SCHOOL ID" fields={[
-            { type: "block", h: 50, w: 30, y: 22, x: 35 },
-            { type: "line",  h: 5,  w: 60, y: 78, x: 20 },
-            { type: "line",  h: 4,  w: 40, y: 88, x: 30 },
-          ]} />
-
-        <FloatingCard accent="#8b5cf6" delay={0.5} rotate={5} top="10%" left="78%" width={190}
-          label="EVENT PASS" fields={[
-            { type: "line", h: 8,  w: 65, y: 24, x: 8 },
-            { type: "line", h: 5,  w: 50, y: 38, x: 8 },
-            { type: "dot",  h: 10, w: 10, y: 60, x: 8 },
-            { type: "block",h: 30, w: 30, y: 55, x: 62 },
-          ]} />
-
-        <FloatingCard accent="#10b981" delay={0.7} rotate={-4} top="62%" left="74%" width={160}
-          label="ACCESS CARD" fields={[
-            { type: "line",  h: 7,  w: 70, y: 28, x: 8 },
-            { type: "line",  h: 4,  w: 50, y: 42, x: 8 },
-            { type: "block", h: 18, w: 80, y: 65, x: 8 },
-          ]} />
-
-        {/* Hero content */}
-        <div style={{ position: "relative", textAlign: "center", maxWidth: 760, zIndex: 10 }}>
-
-          {/* Badge */}
-          <motion.div
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.5 }}
-            style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "rgba(224,92,26,0.12)", border: "1px solid rgba(224,92,26,0.3)", borderRadius: 20, padding: "6px 16px", marginBottom: 28 }}
-          >
-            <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#e05c1a", boxShadow: "0 0 0 3px rgba(224,92,26,0.3)", flexShrink: 0 }} />
-            <span style={{ fontSize: 12, fontWeight: 700, color: "#e05c1a", letterSpacing: 1.5, fontFamily: "'Bebas Neue', sans-serif" }}>PROFESSIONAL ID CARD DESIGNER</span>
-          </motion.div>
-
-          {/* Headline */}
-          <motion.h1
-            initial={{ opacity: 0, y: 40 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 0.1, ease: [0.22, 1, 0.36, 1] }}
-            style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: "clamp(58px, 9vw, 100px)", lineHeight: 0.95, letterSpacing: 2, color: "#f1f5f9", marginBottom: 24 }}
-          >
-            DESIGN YOUR
-            <br />
-            <span style={{ background: "linear-gradient(135deg, #e05c1a 0%, #f97316 50%, #fbbf24 100%)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>
-              IDENTITY
-            </span>
-            <br />
-            IN MINUTES
-          </motion.h1>
-
-          <motion.p
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.7, delay: 0.3 }}
-            style={{ fontSize: 17, color: "#64748b", maxWidth: 520, margin: "0 auto 40px", lineHeight: 1.75 }}
-          >
-            Create stunning, professional-grade ID cards, event passes, and membership cards with our drag-and-drop designer. Print-ready in seconds.
-          </motion.p>
-
-          {/* CTA Buttons */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.7, delay: 0.45 }}
-            style={{ display: "flex", gap: 14, justifyContent: "center", flexWrap: "wrap" }}
-          >
-            <button onClick={requireAuth(() => navigate("/designer/default"))}
-              style={{ padding: "16px 36px", borderRadius: 12, border: "none", background: "linear-gradient(135deg, #e05c1a, #f97316)", color: "#fff", fontWeight: 700, fontSize: 15, cursor: "pointer", letterSpacing: 0.5, fontFamily: "'DM Sans', sans-serif", display: "flex", alignItems: "center", gap: 8, transition: "all 0.2s" }}
-              onMouseEnter={e => { e.currentTarget.style.transform = "scale(1.05)"; e.currentTarget.style.boxShadow = "0 12px 40px rgba(174, 88, 45, 0.55)"; }}
-              onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.boxShadow = "0 4px 20px rgba(24,92,26,0.4)"; }}>
-              ⚡ Start Designing Free
-            </button>
-
-            <button onClick={requireAuth(() => navigate("/templates"))}
-              style={{ padding: "16px 36px", borderRadius: 12, border: "1px solid rgba(255,255,255,0.14)", background: "rgba(255,255,255,0.04)", color: "#e2e8f0", fontWeight: 600, fontSize: 15, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", transition: "all 0.2s" }}
-              onMouseEnter={e => { e.currentTarget.style.background = "rgba(255,255,255,0.08)"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.28)"; }}
-              onMouseLeave={e => { e.currentTarget.style.background = "rgba(255,255,255,0.04)"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.14)"; }}>
-              Browse Templates →
-            </button>
-          </motion.div>
-
-          {/* Social proof */}
-          
-        </div>
-      </section>
+      <HeroSection
+        onStartDesigning={requireAuth(() => navigate("/designer/default"))}
+        onViewTemplates={() => navigate("/templates")}
+      />
 
       {/* ── TICKER ── */}
       <div style={{ background: "#e05c1a", padding: "14px 0", overflow: "hidden", borderTop: "1px solid #f9731622", borderBottom: "1px solid #f9731622" }}>
