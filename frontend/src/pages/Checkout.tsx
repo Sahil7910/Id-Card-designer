@@ -558,7 +558,7 @@ export default function Checkout({
 // ── Order Confirmed Screen ─────────────────────────────────────────
 function OrderConfirmed({ orderId, grandTotal, shipping, shippingMethod, totalCards, onBackToDesigner }:
   { orderId: string; grandTotal: number; shipping: ShippingForm; shippingMethod: ShippingMethod; totalCards: number; onBackToDesigner: () => void }) {
-  const eta = SHIPPING_OPTIONS.find(o => o.id === shippingMethod)!.days;
+  const eta = SHIPPING_META.find(o => o.id === shippingMethod)!.days;
   return (
     <div style={{ fontFamily: "'DM Sans','Segoe UI',sans-serif", background: "#13161d", minHeight: "100vh", color: "#e2e8f0", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
       <div style={{ maxWidth: 520, width: "100%", textAlign: "center" }}>

@@ -63,7 +63,7 @@ export function MiniCardPreview({
 }
 
 // ── Template Page ──────────────────────────────────────────────────
-export default function TemplatePage({ isHorizontal, onApply, onClose }: {
+export default function TemplatePage({ isHorizontal: _isHorizontal, onApply, onClose }: {
   isHorizontal: boolean;
   onApply: (t: CardTemplate) => void;
   onClose: () => void;

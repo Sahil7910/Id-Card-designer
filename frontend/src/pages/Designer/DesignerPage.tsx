@@ -70,7 +70,7 @@ export default function IDCardDesigner() {
   const backCardRef = useRef<HTMLDivElement>(null);
   const previewFrontRef = useRef<HTMLDivElement>(null);
   const previewBackRef = useRef<HTMLDivElement>(null);
-  const [pdfLoading, setPdfLoading] = useLocalState(false);
+  const [, setPdfLoading] = useLocalState(false);
 
   const handleMouseDown = useCallback((e: React.MouseEvent, fieldId: string) => {
     e.preventDefault(); e.stopPropagation();
@@ -155,7 +155,7 @@ export default function IDCardDesigner() {
     setTimeout(() => dispatch(cartActions.setOrderPlaced(false)), 2500);
   };
 
-  const generatePdf = async () => {
+  const _generatePdf = async () => {
     setPdfLoading(true);
     try {
       // Standard CR80 card: 85.6 × 53.98 mm
