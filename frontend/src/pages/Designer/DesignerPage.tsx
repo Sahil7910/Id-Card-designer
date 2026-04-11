@@ -1,3 +1,4 @@
+import DOMPurify from "dompurify";
 import { useRef, useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAppDispatch, useAppSelector } from "../../app/hooks";
@@ -824,7 +825,7 @@ export default function IDCardDesigner() {
                 <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
                   <div style={{ fontSize: 11, fontWeight: 700, color: "#64748b", letterSpacing: 1.5 }}>FRONT SIDE</div>
                   <div ref={previewFrontRef} style={{ width: isHorizontal ? 420 : 260, height: isHorizontal ? 260 : 420, background: "#fff", borderRadius: 16, boxShadow: "0 0 0 3px #e05c1a, 0 20px 60px rgba(0,0,0,0.5)", position: "relative", overflow: "hidden" }}>
-                    {frontBgUrl ? <img src={`${API_BASE}${frontBgUrl}`} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", pointerEvents: "none" }} /> : frontBg ? <div style={{ position: "absolute", inset: 0, pointerEvents: "none" }} dangerouslySetInnerHTML={{ __html: frontBg }} /> : null}
+                    {frontBgUrl ? <img src={`${API_BASE}${frontBgUrl}`} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", pointerEvents: "none" }} /> : frontBg ? <div style={{ position: "absolute", inset: 0, pointerEvents: "none" }} dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(frontBg) }} /> : null}
                     {frontFields.length === 0 && !frontBg && !frontBgUrl && (
                       <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8, color: "#94a3b8" }}>
                         <span style={{ fontSize: 32, opacity: 0.2 }}>{"\u{1FAAA}"}</span>
@@ -839,7 +840,7 @@ export default function IDCardDesigner() {
                   <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
                     <div style={{ fontSize: 11, fontWeight: 700, color: "#64748b", letterSpacing: 1.5 }}>BACK SIDE</div>
                     <div ref={previewBackRef} style={{ width: isHorizontal ? 420 : 260, height: isHorizontal ? 260 : 420, background: "#f8fafc", borderRadius: 16, boxShadow: "0 0 0 3px #6366f1, 0 20px 60px rgba(0,0,0,0.5)", position: "relative", overflow: "hidden", border: "1px dashed #e2e8f033" }}>
-                      {backBgUrl ? <img src={`${API_BASE}${backBgUrl}`} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", pointerEvents: "none" }} /> : backBg ? <div style={{ position: "absolute", inset: 0, pointerEvents: "none" }} dangerouslySetInnerHTML={{ __html: backBg }} /> : null}
+                      {backBgUrl ? <img src={`${API_BASE}${backBgUrl}`} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", pointerEvents: "none" }} /> : backBg ? <div style={{ position: "absolute", inset: 0, pointerEvents: "none" }} dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(backBg) }} /> : null}
                       {backFields.length === 0 && !backBg && !backBgUrl && (
                         <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8, color: "#94a3b8" }}>
                           <span style={{ fontSize: 32, opacity: 0.2 }}>{"\u{1FAAA}"}</span>

@@ -1,3 +1,4 @@
+import DOMPurify from "dompurify";
 import { useState, useEffect } from "react";
 import type { CardField, CardTemplate, FieldType } from "../../shared/types";
 import { TEXT_TYPES } from "../../shared/types";
@@ -27,7 +28,7 @@ export function MiniCardPreview({
       {fullBgUrl ? (
         <img src={fullBgUrl} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", pointerEvents: "none" }} />
       ) : bgSvg ? (
-        <div style={{ position: "absolute", inset: 0, pointerEvents: "none" }} dangerouslySetInnerHTML={{ __html: bgSvg }} />
+        <div style={{ position: "absolute", inset: 0, pointerEvents: "none" }} dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(bgSvg) }} />
       ) : (
         <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 4, background: accent }} />
       )}

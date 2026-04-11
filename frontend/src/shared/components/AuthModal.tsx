@@ -52,7 +52,7 @@ function AuthModalInner({ mode, onClose, onSwitch }: { mode: AuthMode; onClose: 
     if (mode === "signup") {
       if (!form.name.trim()) return setError("Name is required.");
       if (!form.email.includes("@")) return setError("Enter a valid email.");
-      if (form.password.length < 6) return setError("Password must be at least 6 characters.");
+      if (form.password.length < 8) return setError("Password must be at least 8 characters.");
       if (form.password !== form.confirm) return setError("Passwords don't match.");
     } else {
       if (!form.email.includes("@")) return setError("Enter a valid email.");
@@ -78,9 +78,12 @@ function AuthModalInner({ mode, onClose, onSwitch }: { mode: AuthMode; onClose: 
       setSuccess(true);
       setTimeout(onClose, 1200);
     } catch (err: unknown) {
-      const detail = (err as { detail?: string })?.detail
-        ?? (err as { message?: string })?.message
-        ?? "Something went wrong. Please try again.";
+      const errAny = err as { detail?: unknown; message?: string };
+      const detail = Array.isArray(errAny?.detail)
+        ? ((errAny.detail as { msg: string }[])[0]?.msg ?? "Validation error.")
+        : (errAny?.detail as string | undefined)
+          ?? errAny?.message
+          ?? "Something went wrong. Please try again.";
       setError(detail);
     } finally {
       setLoading(false);
@@ -148,7 +151,7 @@ function AuthModalInner({ mode, onClose, onSwitch }: { mode: AuthMode; onClose: 
                 )}
                 <AuthInput ref={mode === "login" ? inputRef : undefined} label="Email Address" type="email" value={form.email} onChange={set("email")} placeholder="you@company.com" icon="✉️" />
                 <div style={{ position: "relative" }}>
-                  <AuthInput label="Password" type={showPass ? "text" : "password"} value={form.password} onChange={set("password")} placeholder={mode === "signup" ? "Min. 6 characters" : "Your password"} icon="🔒" />
+                  <AuthInput label="Password" type={showPass ? "text" : "password"} value={form.password} onChange={set("password")} placeholder={mode === "signup" ? "Min. 8 chars, uppercase, lowercase, number" : "Your password"} icon="🔒" />
                   <button onClick={() => setShowPass(v => !v)}
                     style={{ position: "absolute", right: 14, bottom: 11, background: "none", border: "none", color: "#475569", cursor: "pointer", fontSize: 12, fontWeight: 600 }}>
                     {showPass ? "HIDE" : "SHOW"}
