@@ -20,16 +20,6 @@ const SUBTEXT =
 const CTA_PRIMARY   = "⚡ Start Designing";
 const CTA_SECONDARY = "View Templates →";
 
-const TRUST_COUNT  = "10,000+";
-const TRUST_SUFFIX = "professionals trust CardCraft";
-
-const TRUST_AVATARS = [
-  { letter: "S", from: "#e05c1a", to: "#f97316" },
-  { letter: "A", from: "#0ea5e9", to: "#38bdf8" },
-  { letter: "R", from: "#8b5cf6", to: "#a78bfa" },
-  { letter: "M", from: "#10b981", to: "#34d399" },
-  { letter: "P", from: "#f97316", to: "#fbbf24" },
-] as const;
 
 const ORBIT_BADGES = [
   {
@@ -77,15 +67,6 @@ const fadeUpVariants = {
     transition: { duration: 0.78, ease: [0.22, 1, 0.36, 1] as const },
   },
 };
-
-const fadeInVariants = {
-  hidden: { opacity: 0 },
-  visible: {
-    opacity: 1,
-    transition: { duration: 0.65 },
-  },
-};
-
 
 
 // ── Props ──────────────────────────────────────────────────────────────────────
@@ -507,14 +488,12 @@ export default function HeroSection({
             animate="visible"
             className="flex flex-col gap-7"
           >
-          
             <HeroHeading />
             <HeroDescription />
             <CTAButtons
               onStartDesigning={onStartDesigning}
               onViewTemplates={onViewTemplates}
             />
-           
           </motion.div>
 
           {/* ── Right Column — Preview ── */}

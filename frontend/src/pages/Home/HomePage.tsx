@@ -15,8 +15,8 @@ if (typeof document !== "undefined" && !document.getElementById("hp-fonts")) {
   document.head.appendChild(link);
 }
 
-// ── Animated floating card ─────────────────────────────────────────
-function FloatingCard({
+// ── Animated floating card (used in other sections) ───────────────
+function _FloatingCard({
   accent, delay, rotate, top, left, width, label, fields,
 }: {
   accent: string; delay: number; rotate: number;
