@@ -153,7 +153,7 @@ async def get_stats(
     orders_by_status = {row[0]: row[1] for row in status_result.all()}
 
     # Last 30 days
-    thirty_days_ago = datetime.now(timezone.utc) - timedelta(days=30)
+    thirty_days_ago = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=30)
     last30_result = await db.execute(
         select(func.count(Order.id), func.coalesce(func.sum(Order.grand_total), 0))
         .where(Order.created_at >= thirty_days_ago)
