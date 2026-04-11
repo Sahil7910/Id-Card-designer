@@ -1,7 +1,11 @@
+import hashlib
+import hmac
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import settings
 from app.database import get_db
 from app.dependencies import get_current_admin, get_current_user
 from app.models.order import Order
@@ -12,12 +16,37 @@ from app.services.order_service import create_order
 router = APIRouter()
 
 
+def _verify_razorpay_signature(order_id: str, payment_id: str, signature: str) -> bool:
+    """Verify Razorpay HMAC-SHA256 signature."""
+    message = f"{order_id}|{payment_id}".encode()
+    secret = settings.RAZORPAY_KEY_SECRET.encode()
+    expected = hmac.new(secret, message, digestmod=hashlib.sha256).hexdigest()
+    return hmac.compare_digest(expected, signature)
+
+
 @router.post("/", response_model=OrderResponse, status_code=status.HTTP_201_CREATED)
 async def place_order(
     data: OrderCreate,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    # Verify Razorpay payment signature for non-COD payments
+    if data.payment_method != "cod":
+        if not all([data.razorpay_payment_id, data.razorpay_order_id, data.razorpay_signature]):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Payment verification fields missing.",
+            )
+        if not _verify_razorpay_signature(
+            data.razorpay_order_id,  # type: ignore[arg-type]
+            data.razorpay_payment_id,  # type: ignore[arg-type]
+            data.razorpay_signature,  # type: ignore[arg-type]
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Payment verification failed.",
+            )
+
     order = await create_order(db, user.id, data)
     return order
 

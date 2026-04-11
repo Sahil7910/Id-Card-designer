@@ -14,10 +14,14 @@ class Settings(BaseSettings):
     # ── SMTP (Gmail) ──────────────────────────────────────────────────────────
     SMTP_HOST: str = "smtp.gmail.com"
     SMTP_PORT: int = 587
-    SMTP_USER: str = "print.sensedge@gmail.com"
-    SMTP_PASSWORD: str = "jhcw gtxq hoit rjoz"
+    SMTP_USER: str = ""
+    SMTP_PASSWORD: str = ""
     SMTP_FROM_NAME: str = "ID Card Designer"
-    SMTP_FROM_EMAIL: str = "print.sensedge@gmail.com"
+    SMTP_FROM_EMAIL: str = ""
+
+    # ── Razorpay ──────────────────────────────────────────────────────────────
+    RAZORPAY_KEY_ID: str = ""
+    RAZORPAY_KEY_SECRET: str = ""
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 

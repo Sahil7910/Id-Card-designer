@@ -56,7 +56,8 @@ async def create_order(db: AsyncSession, user_id: str, data: OrderCreate) -> Ord
     order = Order(
         order_number=generate_order_number(),
         user_id=user_id,
-        status="confirmed",
+        status="pending" if data.payment_method == "cod" else "confirmed",
+        payment_ref=data.razorpay_payment_id if data.payment_method != "cod" else None,
         shipping_address=data.shipping.model_dump(),
         shipping_method=data.shipping_method,
         shipping_cost=totals["shipping_cost"],
