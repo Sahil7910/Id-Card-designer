@@ -86,14 +86,7 @@ const fadeInVariants = {
   },
 };
 
-const badgeVariants = {
-  hidden: { opacity: 0, scale: 0.82 },
-  visible: {
-    opacity: 1,
-    scale: 1,
-    transition: { duration: 0.55, ease: [0.22, 1, 0.36, 1] as const },
-  },
-};
+
 
 // ── Props ──────────────────────────────────────────────────────────────────────
 interface HeroSectionProps {
@@ -252,55 +245,7 @@ function CTAButtons({
   );
 }
 
-// ── TrustBar ───────────────────────────────────────────────────────────────────
-function TrustBar() {
-  return (
-    <motion.div
-      variants={fadeInVariants}
-      className="flex items-center gap-4 pt-1"
-    >
-      {/* Stacked avatars */}
-      <div className="flex -space-x-2.5">
-        {TRUST_AVATARS.map((av, i) => (
-          <div
-            key={i}
-            className="w-8 h-8 rounded-full border-2 border-[#080a12] flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
-            style={{
-              background: `linear-gradient(135deg, ${av.from}, ${av.to})`,
-              zIndex: TRUST_AVATARS.length - i,
-              fontFamily: "'DM Sans', sans-serif",
-            }}
-          >
-            {av.letter}
-          </div>
-        ))}
-      </div>
 
-      <div className="flex flex-col gap-0.5">
-        {/* Stars */}
-        <div className="flex items-center gap-0.5">
-          {[...Array(5)].map((_, i) => (
-            <span key={i} className="text-[#f59e0b] text-xs leading-none">★</span>
-          ))}
-          <span
-            className="text-[#64748b] text-xs ml-1.5"
-            style={{ fontFamily: "'DM Sans', sans-serif" }}
-          >
-            4.9 / 5
-          </span>
-        </div>
-        {/* Caption */}
-        <p
-          className="text-[#475569] text-xs leading-none"
-          style={{ fontFamily: "'DM Sans', sans-serif" }}
-        >
-          <span className="text-[#94a3b8] font-semibold">{TRUST_COUNT}</span>{" "}
-          {TRUST_SUFFIX}
-        </p>
-      </div>
-    </motion.div>
-  );
-}
 
 // ── IDCardMockup ───────────────────────────────────────────────────────────────
 function IDCardMockup() {
