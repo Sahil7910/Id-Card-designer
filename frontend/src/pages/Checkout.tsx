@@ -1,5 +1,6 @@
-import { useState, useEffect } from "react";
-import type { CartItem, ShippingForm, PaymentForm, ShippingMethod, PaymentMethod, CheckoutStep } from "../shared/types";
+import { useState, useEffect, useCallback } from "react";
+import type { CartItem, ShippingForm, AddressForm, PaymentForm, ShippingMethod, PaymentMethod, CheckoutStep } from "../shared/types";
+import { CheckoutForm } from "../features/order/components/CheckoutForm";
 import { api } from "../shared/utils";
 import { useAppSelector, useAppDispatch } from "../app/hooks";
 import { selectIsAuthenticated, authActions } from "../features/auth/authSlice";
@@ -12,8 +13,6 @@ const SHIPPING_META: { id: ShippingMethod; label: string; desc: string; days: st
   { id: "express",   label: "Express Shipping",   desc: "Priority handling", days: "2–3 business days" },
   { id: "overnight", label: "Overnight Shipping", desc: "Next day delivery", days: "1 business day"    },
 ];
-
-const COUNTRIES = ["India", "United States", "United Kingdom", "Canada", "Australia", "Germany", "France", "Singapore", "UAE", "Other"];
 
 const STEP_LIST: { key: Step; label: string; icon: string }[] = [
   { key: "cart",      label: "Cart",     icon: "🛒" },
@@ -35,9 +34,11 @@ export default function Checkout({
   const [step, setStep] = useState<Step>("cart");
   const [shipping, setShipping] = useState<ShippingForm>({
     firstName: "", lastName: "", email: "", phone: "", company: "",
-    address1: "", address2: "", city: "", state: "", zip: "", country: "India",
+    address1: "", address2: "", city: "", state: "", district: "", zip: "", country: "India",
   });
-  const [billing, setBilling] = useState({ address1: "", address2: "", city: "", state: "", zip: "", country: "India" });
+  const [billing, setBilling] = useState<AddressForm>({
+    address1: "", address2: "", city: "", state: "", district: "", zip: "", country: "India",
+  });
   const [sameAsBilling, setSameAsBilling] = useState(true);
   const [shippingMethod, setShippingMethod] = useState<ShippingMethod>("standard");
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("card");
@@ -54,6 +55,11 @@ export default function Checkout({
   const [shippingPrices, setShippingPrices] = useState<Record<string, number>>({
     shipping_standard: 0, shipping_express: 9.99, shipping_overnight: 24.99,
   });
+  const [billingAddrValid,  setBillingAddrValid]  = useState(false);
+  const [shippingAddrValid, setShippingAddrValid] = useState(false);
+  const handleBillingValidityChange = useCallback((v: boolean) => setBillingAddrValid(v),  []);
+  const handleShippingAddrValidity  = useCallback((v: boolean) => setShippingAddrValid(v), []);
+
   const isAuthenticated = useAppSelector(selectIsAuthenticated);
   const dispatch = useAppDispatch();
 
@@ -140,9 +146,14 @@ export default function Checkout({
     }
   };
 
-  const billingAddrValid = !!(billing.address1 && billing.city && billing.zip);
-  const shippingAddrValid = sameAsBilling || !!(shipping.address1 && shipping.city && shipping.zip);
-  const shippingValid = !!(shipping.firstName && shipping.lastName && shipping.email && shipping.phone && billingAddrValid && shippingAddrValid);
+  const shippingValid = !!(
+    shipping.firstName &&
+    shipping.lastName &&
+    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(shipping.email) &&
+    /^\d{10}$/.test(shipping.phone.replace(/\D/g, "")) &&
+    billingAddrValid &&
+    (sameAsBilling || shippingAddrValid)
+  );
   const paymentValid  = paymentMethod === "cod" || (paymentMethod === "card" ? (payment.cardHolder && payment.cardNumber.length >= 16 && payment.expiry && payment.cvv) : true);
 
   const stepIndex = STEP_LIST.findIndex(s => s.key === step);
@@ -238,25 +249,12 @@ export default function Checkout({
               </div>
 
               {/* Billing Address */}
-              <div style={{ background: "#1e2330", border: "1px solid #2a2f3e", borderRadius: 12, padding: "20px 20px", marginBottom: 20 }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: "#64748b", letterSpacing: 1.2, marginBottom: 14 }}>BILLING ADDRESS</div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                  <FormField label="Address Line 1 *" value={billing.address1} onChange={v => setBilling(b => ({ ...b, address1: v }))} placeholder="123 Main Street" />
-                  <FormField label="Address Line 2" value={billing.address2} onChange={v => setBilling(b => ({ ...b, address2: v }))} placeholder="Apt, Suite, Floor (optional)" />
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
-                    <FormField label="City *" value={billing.city} onChange={v => setBilling(b => ({ ...b, city: v }))} placeholder="New York" />
-                    <FormField label="State / Province" value={billing.state} onChange={v => setBilling(b => ({ ...b, state: v }))} placeholder="NY" />
-                    <FormField label="ZIP / Postal *" value={billing.zip} onChange={v => setBilling(b => ({ ...b, zip: v }))} placeholder="10001" />
-                  </div>
-                  <div>
-                    <div style={{ fontSize: 11, color: "#94a3b8", fontWeight: 600, marginBottom: 5 }}>Country *</div>
-                    <select value={billing.country} onChange={e => setBilling(b => ({ ...b, country: e.target.value }))}
-                      style={{ width: "100%", background: "#13161d", border: "1px solid #2a2f3e", color: "#e2e8f0", borderRadius: 7, padding: "9px 12px", fontSize: 13, outline: "none", appearance: "none", cursor: "pointer" }}>
-                      {COUNTRIES.map(c => <option key={c} value={c}>{c}</option>)}
-                    </select>
-                  </div>
-                </div>
-              </div>
+              <CheckoutForm
+                title="BILLING ADDRESS"
+                values={billing}
+                onChange={setBilling}
+                onValidityChange={handleBillingValidityChange}
+              />
 
               {/* Same as billing checkbox */}
               <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", marginBottom: 20, padding: "12px 16px", background: "#1e2330", border: "1px solid #2a2f3e", borderRadius: 10 }}>
@@ -269,25 +267,17 @@ export default function Checkout({
 
               {/* Shipping Address */}
               {!sameAsBilling && (
-                <div style={{ background: "#1e2330", border: "1px solid #2a2f3e", borderRadius: 12, padding: "20px 20px", marginBottom: 20 }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: "#64748b", letterSpacing: 1.2, marginBottom: 14 }}>SHIPPING ADDRESS</div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                    <FormField label="Address Line 1 *" value={shipping.address1} onChange={v => setShipping(s => ({ ...s, address1: v }))} placeholder="123 Main Street" />
-                    <FormField label="Address Line 2" value={shipping.address2} onChange={v => setShipping(s => ({ ...s, address2: v }))} placeholder="Apt, Suite, Floor (optional)" />
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
-                      <FormField label="City *" value={shipping.city} onChange={v => setShipping(s => ({ ...s, city: v }))} placeholder="New York" />
-                      <FormField label="State / Province" value={shipping.state} onChange={v => setShipping(s => ({ ...s, state: v }))} placeholder="NY" />
-                      <FormField label="ZIP / Postal *" value={shipping.zip} onChange={v => setShipping(s => ({ ...s, zip: v }))} placeholder="10001" />
-                    </div>
-                    <div>
-                      <div style={{ fontSize: 11, color: "#94a3b8", fontWeight: 600, marginBottom: 5 }}>Country *</div>
-                      <select value={shipping.country} onChange={e => setShipping(s => ({ ...s, country: e.target.value }))}
-                        style={{ width: "100%", background: "#13161d", border: "1px solid #2a2f3e", color: "#e2e8f0", borderRadius: 7, padding: "9px 12px", fontSize: 13, outline: "none", appearance: "none", cursor: "pointer" }}>
-                        {COUNTRIES.map(c => <option key={c} value={c}>{c}</option>)}
-                      </select>
-                    </div>
-                  </div>
-                </div>
+                <CheckoutForm
+                  title="SHIPPING ADDRESS"
+                  values={{
+                    address1: shipping.address1, address2: shipping.address2,
+                    city:     shipping.city,     state:    shipping.state,
+                    district: shipping.district, zip:      shipping.zip,
+                    country:  shipping.country,
+                  }}
+                  onChange={addr => setShipping(s => ({ ...s, ...addr }))}
+                  onValidityChange={handleShippingAddrValidity}
+                />
               )}
 
               {/* Shipping methods */}
