@@ -1,7 +1,5 @@
-import { useRef, useCallback, useEffect, useState as useLocalState } from "react";
+import { useRef, useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import html2canvas from "html2canvas";
-import { jsPDF } from "jspdf";
 import { useAppDispatch, useAppSelector } from "../../app/hooks";
 import { designerActions } from "../../features/designer/designerSlice";
 import { cartActions } from "../../features/cart/cartSlice";
@@ -70,7 +68,6 @@ export default function IDCardDesigner() {
   const backCardRef = useRef<HTMLDivElement>(null);
   const previewFrontRef = useRef<HTMLDivElement>(null);
   const previewBackRef = useRef<HTMLDivElement>(null);
-  const [, setPdfLoading] = useLocalState(false);
 
   const handleMouseDown = useCallback((e: React.MouseEvent, fieldId: string) => {
     e.preventDefault(); e.stopPropagation();
@@ -155,51 +152,7 @@ export default function IDCardDesigner() {
     setTimeout(() => dispatch(cartActions.setOrderPlaced(false)), 2500);
   };
 
-  const _generatePdf = async () => {
-    setPdfLoading(true);
-    try {
-      // Standard CR80 card: 85.6 × 53.98 mm
-      const cardWidthMM = 85.6;
-      const cardHeightMM = 53.98;
-      const isH = orientation === "Horizontal";
-      const pageW = isH ? cardWidthMM : cardHeightMM;
-      const pageH = isH ? cardHeightMM : cardWidthMM;
 
-      const pdf = new jsPDF({ orientation: isH ? "landscape" : "portrait", unit: "mm", format: [pageW, pageH] });
-
-      const captureCard = async (ref: React.RefObject<HTMLDivElement | null>) => {
-        if (!ref.current) return null;
-        const canvas = await html2canvas(ref.current, {
-          scale: 3,
-          useCORS: true,
-          backgroundColor: "#ffffff",
-          logging: false,
-        });
-        return canvas.toDataURL("image/png");
-      };
-
-      // Front side
-      const frontImg = await captureCard(previewFrontRef);
-      if (frontImg) {
-        pdf.addImage(frontImg, "PNG", 0, 0, pageW, pageH);
-      }
-
-      // Back side
-      if (printSide === "Both Sides") {
-        const backImg = await captureCard(previewBackRef);
-        if (backImg) {
-          pdf.addPage([pageW, pageH], isH ? "landscape" : "portrait");
-          pdf.addImage(backImg, "PNG", 0, 0, pageW, pageH);
-        }
-      }
-
-      pdf.save(`id-card-design-${Date.now()}.pdf`);
-    } catch (err) {
-      console.error("PDF generation failed:", err);
-    } finally {
-      setPdfLoading(false);
-    }
-  };
 
   const isAuthenticated = useAppSelector(selectIsAuthenticated);
   const authUser = useAppSelector(selectAuthUser);
