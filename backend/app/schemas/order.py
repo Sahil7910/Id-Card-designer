@@ -37,10 +37,6 @@ class OrderCreate(BaseModel):
     shipping: ShippingAddress
     shipping_method: Literal["standard", "express", "overnight"]
     payment_method: Literal["card", "upi", "netbanking", "cod"]
-    # Razorpay verification fields (required for non-COD payments)
-    razorpay_payment_id: str | None = None
-    razorpay_order_id: str | None = None
-    razorpay_signature: str | None = None
 
 
 class OrderItemResponse(BaseModel):

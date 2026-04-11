@@ -8,7 +8,7 @@ from slowapi.middleware import SlowAPIMiddleware
 
 from app.config import settings
 from app.limiter import limiter
-from app.routers import admin, auth, designs, orders, payments, pricing, templates, uploads
+from app.routers import admin, auth, designs, orders, pricing, templates, uploads
 
 app = FastAPI(
     title="ID Card Designer API",
@@ -45,7 +45,6 @@ app.include_router(templates.router, prefix="/api/templates", tags=["Templates"]
 app.include_router(orders.router, prefix="/api/orders", tags=["Orders"])
 app.include_router(uploads.router, prefix="/api/uploads", tags=["Uploads"])
 app.include_router(pricing.router, prefix="/api/pricing", tags=["Pricing"])
-app.include_router(payments.router, prefix="/api/payments", tags=["Payments"])
 app.include_router(admin.router, prefix="/api/admin", tags=["Admin"])
 
 app.mount("/uploads", StaticFiles(directory=settings.UPLOAD_DIR), name="uploads")

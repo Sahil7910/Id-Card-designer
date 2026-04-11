@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
-import type { CartItem, ShippingForm, ShippingMethod, PaymentMethod, CheckoutStep } from "../shared/types";
-import type { RazorpayHandlerResponse } from "../types/razorpay";
+import type { CartItem, ShippingForm, PaymentForm, ShippingMethod, PaymentMethod, CheckoutStep } from "../shared/types";
 import { api } from "../shared/utils";
 import { useAppSelector, useAppDispatch } from "../app/hooks";
 import { selectIsAuthenticated, authActions } from "../features/auth/authSlice";
@@ -42,7 +41,9 @@ export default function Checkout({
   const [sameAsBilling, setSameAsBilling] = useState(true);
   const [shippingMethod, setShippingMethod] = useState<ShippingMethod>("standard");
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("card");
-  const [paymentError, setPaymentError] = useState("");
+  const [payment, setPayment] = useState<PaymentForm>({
+    cardHolder: "", cardNumber: "", expiry: "", cvv: "", saveCard: false,
+  });
   const [, /* promoCode */ _setPromoCode] = useState("");
   const [promoApplied, _setPromoApplied] = useState(false);
   const [, /* promoError */ _setPromoError] = useState("");
@@ -90,103 +91,49 @@ export default function Checkout({
     }
     setOrderLoading(true);
     setOrderError("");
-    setPaymentError("");
-
-    const orderPayload = {
-      items: cartItems.map(item => ({
-        card_type: item.cardType,
-        printer: item.printer,
-        print_side: item.printSide,
-        orientation: item.orientation,
-        chip_type: item.chipType,
-        finish: item.finish,
-        material: item.material,
-        quantity: item.quantity,
-        design_id: null,
-        front_field_count: item.frontFieldCount,
-        back_field_count: item.backFieldCount,
-      })),
-      shipping: {
-        first_name: shipping.firstName,
-        last_name: shipping.lastName,
-        email: shipping.email,
-        phone: shipping.phone,
-        company: shipping.company,
-        address1: sameAsBilling ? billing.address1 : shipping.address1,
-        address2: sameAsBilling ? billing.address2 : shipping.address2,
-        city: sameAsBilling ? billing.city : shipping.city,
-        state: sameAsBilling ? billing.state : shipping.state,
-        zip: sameAsBilling ? billing.zip : shipping.zip,
-        country: sameAsBilling ? billing.country : shipping.country,
-      },
-      billing: {
-        address1: billing.address1,
-        address2: billing.address2,
-        city: billing.city,
-        state: billing.state,
-        zip: billing.zip,
-        country: billing.country,
-      },
-      shipping_method: shippingMethod,
-      payment_method: paymentMethod,
-    };
-
     try {
-      if (paymentMethod === "cod") {
-        // COD: place order directly — no payment
-        const res = await api.post<{ order_number: string }>("/api/orders/", orderPayload);
-        setOrderId(res.order_number);
-        setStep("confirmed");
-      } else {
-        // Razorpay: initiate order → open popup → verify → create DB order
-        const initData = await api.post<{
-          razorpay_order_id: string;
-          amount_paise: number;
-          currency: string;
-          key_id: string;
-        }>("/api/payments/initiate", { amount: grandTotal });
-
-        await new Promise<void>((resolve, reject) => {
-          const rzp = new window.Razorpay({
-            key: initData.key_id,
-            amount: initData.amount_paise,
-            currency: initData.currency,
-            order_id: initData.razorpay_order_id,
-            name: "ID Card Designer",
-            description: `${totalCards} ID Card${totalCards !== 1 ? "s" : ""}`,
-            prefill: {
-              name: `${shipping.firstName} ${shipping.lastName}`.trim(),
-              email: shipping.email,
-              contact: shipping.phone,
-            },
-            theme: { color: "#e05c1a" },
-            handler: async (response: RazorpayHandlerResponse) => {
-              try {
-                const res = await api.post<{ order_number: string }>("/api/orders/", {
-                  ...orderPayload,
-                  razorpay_payment_id: response.razorpay_payment_id,
-                  razorpay_order_id: response.razorpay_order_id,
-                  razorpay_signature: response.razorpay_signature,
-                });
-                setOrderId(res.order_number);
-                setStep("confirmed");
-                resolve();
-              } catch (err) {
-                reject(err);
-              }
-            },
-            modal: {
-              ondismiss: () => reject(new Error("Payment cancelled.")),
-            },
-          });
-          rzp.open();
-        });
-      }
+      const res = await api.post<{ order_number: string }>("/api/orders/", {
+        items: cartItems.map(item => ({
+          card_type: item.cardType,
+          printer: item.printer,
+          print_side: item.printSide,
+          orientation: item.orientation,
+          chip_type: item.chipType,
+          finish: item.finish,
+          material: item.material,
+          quantity: item.quantity,
+          design_id: null,
+          front_field_count: item.frontFieldCount,
+          back_field_count: item.backFieldCount,
+        })),
+        shipping: {
+          first_name: shipping.firstName,
+          last_name: shipping.lastName,
+          email: shipping.email,
+          phone: shipping.phone,
+          company: shipping.company,
+          address1: sameAsBilling ? billing.address1 : shipping.address1,
+          address2: sameAsBilling ? billing.address2 : shipping.address2,
+          city: sameAsBilling ? billing.city : shipping.city,
+          state: sameAsBilling ? billing.state : shipping.state,
+          zip: sameAsBilling ? billing.zip : shipping.zip,
+          country: sameAsBilling ? billing.country : shipping.country,
+        },
+        billing: {
+          address1: billing.address1,
+          address2: billing.address2,
+          city: billing.city,
+          state: billing.state,
+          zip: billing.zip,
+          country: billing.country,
+        },
+        shipping_method: shippingMethod,
+        payment_method: paymentMethod,
+      });
+      setOrderId(res.order_number);
+      setStep("confirmed");
     } catch (err: unknown) {
-      const detail =
-        (err as { detail?: string })?.detail ??
-        (err as Error)?.message ??
-        "Failed to place order. Please try again.";
+      const detail = (err as { detail?: string })?.detail ?? "Failed to place order. Please try again.";
       setOrderError(detail);
     } finally {
       setOrderLoading(false);
@@ -196,7 +143,7 @@ export default function Checkout({
   const billingAddrValid = !!(billing.address1 && billing.city && billing.zip);
   const shippingAddrValid = sameAsBilling || !!(shipping.address1 && shipping.city && shipping.zip);
   const shippingValid = !!(shipping.firstName && shipping.lastName && shipping.email && shipping.phone && billingAddrValid && shippingAddrValid);
-  const paymentValid  = true; // Razorpay handles all payment collection
+  const paymentValid  = paymentMethod === "cod" || (paymentMethod === "card" ? (payment.cardHolder && payment.cardNumber.length >= 16 && payment.expiry && payment.cvv) : true);
 
   const stepIndex = STEP_LIST.findIndex(s => s.key === step);
 
@@ -393,29 +340,74 @@ export default function Checkout({
                 </div>
               </div>
 
-              {/* Razorpay info panel for card / UPI / netbanking */}
-              {paymentMethod !== "cod" && (
-                <div style={{ background: "#0f2318", border: "1px solid #16a34a44", borderRadius: 12, padding: "20px 20px", marginBottom: 20 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
-                    <span style={{ fontSize: 28 }}>🔒</span>
-                    <div>
-                      <div style={{ fontSize: 14, fontWeight: 700, color: "#4ade80" }}>Secure Payment via Razorpay</div>
-                      <div style={{ fontSize: 12, color: "#166534", marginTop: 2 }}>
-                        {paymentMethod === "card" && "Pay with credit or debit card — Visa, Mastercard, RuPay and more."}
-                        {paymentMethod === "upi" && "Pay instantly with any UPI app — GPay, PhonePe, Paytm and more."}
-                        {paymentMethod === "netbanking" && "Pay directly from your bank account via net banking."}
+              {/* Card form */}
+              {paymentMethod === "card" && (
+                <div style={{ background: "#1e2330", border: "1px solid #2a2f3e", borderRadius: 12, padding: "20px 20px", marginBottom: 20 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: "#64748b", letterSpacing: 1.2, marginBottom: 14 }}>CARD DETAILS</div>
+
+                  {/* Card visual */}
+                  <div style={{ background: "linear-gradient(135deg, #1e3a8a 0%, #3730a3 100%)", borderRadius: 12, padding: "20px 22px", marginBottom: 18, aspectRatio: "1.586", maxWidth: 320, position: "relative", overflow: "hidden" }}>
+                    <div style={{ position: "absolute", top: -30, right: -30, width: 120, height: 120, borderRadius: "50%", background: "rgba(255,255,255,0.06)" }} />
+                    <div style={{ position: "absolute", bottom: -20, left: -20, width: 100, height: 100, borderRadius: "50%", background: "rgba(255,255,255,0.04)" }} />
+                    <div style={{ fontSize: 22, marginBottom: 16, letterSpacing: 2, color: "rgba(255,255,255,0.3)" }}>💳</div>
+                    <div style={{ fontFamily: "'Courier New', monospace", fontSize: 15, letterSpacing: 3, color: "#fff", marginBottom: 16, position: "relative" }}>
+                      {payment.cardNumber ? payment.cardNumber.replace(/(.{4})/g, "$1 ").trim() || "•••• •••• •••• ••••" : "•••• •••• •••• ••••"}
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
+                      <div>
+                        <div style={{ fontSize: 9, color: "rgba(255,255,255,0.5)", letterSpacing: 1, marginBottom: 2 }}>CARD HOLDER</div>
+                        <div style={{ fontSize: 13, color: "#fff", fontWeight: 600 }}>{payment.cardHolder || "YOUR NAME"}</div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 9, color: "rgba(255,255,255,0.5)", letterSpacing: 1, marginBottom: 2 }}>EXPIRES</div>
+                        <div style={{ fontSize: 13, color: "#fff", fontWeight: 600 }}>{payment.expiry || "MM/YY"}</div>
                       </div>
                     </div>
                   </div>
-                  <div style={{ fontSize: 11, color: "#166534", lineHeight: 1.6 }}>
-                    Clicking <strong style={{ color: "#4ade80" }}>Pay with Razorpay</strong> will open a secure payment popup.
-                    Your card or account details are never stored on our servers.
-                  </div>
-                  {paymentError && (
-                    <div style={{ marginTop: 10, color: "#ef4444", fontSize: 12, padding: "6px 10px", background: "#ef444412", borderRadius: 6, border: "1px solid #ef444433" }}>
-                      {paymentError}
+
+                  <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                    <FormField label="Card Holder Name" value={payment.cardHolder} onChange={v => setPayment(p => ({ ...p, cardHolder: v.toUpperCase() }))} placeholder="JOHN SMITH" />
+                    <FormField label="Card Number" value={payment.cardNumber} onChange={v => setPayment(p => ({ ...p, cardNumber: v.replace(/\D/g, "").slice(0, 16) }))} placeholder="1234 5678 9012 3456" />
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                      <FormField label="Expiry Date" value={payment.expiry} onChange={v => {
+                        const clean = v.replace(/\D/g, "").slice(0, 4);
+                        setPayment(p => ({ ...p, expiry: clean.length > 2 ? clean.slice(0, 2) + "/" + clean.slice(2) : clean }));
+                      }} placeholder="MM/YY" />
+                      <FormField label="CVV" value={payment.cvv} onChange={v => setPayment(p => ({ ...p, cvv: v.replace(/\D/g, "").slice(0, 4) }))} placeholder="•••" type="password" />
                     </div>
-                  )}
+                    <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", fontSize: 12, color: "#94a3b8" }}>
+                      <div onClick={() => setPayment(p => ({ ...p, saveCard: !p.saveCard }))}
+                        style={{ width: 18, height: 18, borderRadius: 4, border: `2px solid ${payment.saveCard ? "#e05c1a" : "#3a3f52"}`, background: payment.saveCard ? "#e05c1a" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                        {payment.saveCard && <span style={{ fontSize: 11, color: "#fff", lineHeight: 1 }}>✓</span>}
+                      </div>
+                      Save card for future orders
+                    </label>
+                  </div>
+                </div>
+              )}
+
+              {/* UPI */}
+              {paymentMethod === "upi" && (
+                <div style={{ background: "#1e2330", border: "1px solid #2a2f3e", borderRadius: 12, padding: "20px 20px", marginBottom: 20 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: "#64748b", letterSpacing: 1.2, marginBottom: 14 }}>UPI PAYMENT</div>
+                  <FormField label="UPI ID" value="" onChange={() => {}} placeholder="yourname@upi" />
+                  <p style={{ fontSize: 11, color: "#475569", marginTop: 8 }}>Enter your UPI ID (e.g. name@okaxis, name@paytm)</p>
+                </div>
+              )}
+
+              {/* Net Banking */}
+              {paymentMethod === "netbanking" && (
+                <div style={{ background: "#1e2330", border: "1px solid #2a2f3e", borderRadius: 12, padding: "20px 20px", marginBottom: 20 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: "#64748b", letterSpacing: 1.2, marginBottom: 14 }}>SELECT BANK</div>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
+                    {["SBI", "HDFC", "ICICI", "Axis", "Kotak", "Other"].map(bank => (
+                      <button key={bank} style={{ padding: "12px 8px", borderRadius: 8, border: "1px solid #2a2f3e", background: "#13161d", color: "#94a3b8", cursor: "pointer", fontSize: 12, fontWeight: 600 }}
+                        onMouseEnter={e => { e.currentTarget.style.borderColor = "#e05c1a"; e.currentTarget.style.color = "#e05c1a"; }}
+                        onMouseLeave={e => { e.currentTarget.style.borderColor = "#2a2f3e"; e.currentTarget.style.color = "#94a3b8"; }}>
+                        🏦 {bank}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               )}
 
@@ -475,9 +467,9 @@ export default function Checkout({
               </ReviewBlock>
 
               <ReviewBlock title="💳 Payment" onEdit={() => setStep("payment")}>
-                {paymentMethod === "card" && <div style={{ fontSize: 13, color: "#e2e8f0" }}>Card (via Razorpay)</div>}
-                {paymentMethod === "upi" && <div style={{ fontSize: 13, color: "#e2e8f0" }}>UPI (via Razorpay)</div>}
-                {paymentMethod === "netbanking" && <div style={{ fontSize: 13, color: "#e2e8f0" }}>Net Banking (via Razorpay)</div>}
+                {paymentMethod === "card" && <div style={{ fontSize: 13, color: "#e2e8f0" }}>Card ending in {payment.cardNumber.slice(-4) || "••••"}</div>}
+                {paymentMethod === "upi" && <div style={{ fontSize: 13, color: "#e2e8f0" }}>UPI Payment</div>}
+                {paymentMethod === "netbanking" && <div style={{ fontSize: 13, color: "#e2e8f0" }}>Net Banking</div>}
                 {paymentMethod === "cod" && <div style={{ fontSize: 13, color: "#e2e8f0" }}>Cash on Delivery</div>}
               </ReviewBlock>
 
@@ -498,13 +490,7 @@ export default function Checkout({
 
               <NavButtons onBack={() => setStep("payment")}
                 onNext={placeOrder}
-                nextLabel={
-                  orderLoading
-                    ? "Processing..."
-                    : paymentMethod === "cod"
-                      ? "✓ Place Order"
-                      : `Pay ₹${grandTotal.toFixed(2)} with Razorpay`
-                }
+                nextLabel={orderLoading ? "Placing Order..." : "✓ Place Order"}
                 nextDisabled={!agreeTerms || orderLoading}
                 nextAccent
               />
