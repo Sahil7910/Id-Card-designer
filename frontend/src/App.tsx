@@ -1,0 +1,32 @@
+import { useEffect } from 'react'
+import { BrowserRouter } from 'react-router-dom'
+import AppRoutes from './routes/AppRoutes'
+import { ErrorBoundary, AuthModal } from './shared/components'
+import { useAppDispatch, useAppSelector } from './app/hooks'
+import { fetchUser } from './features/auth/authSlice'
+
+function AppInner() {
+  const dispatch = useAppDispatch();
+  const token = useAppSelector(state => state.auth.token);
+
+  useEffect(() => {
+    if (token) dispatch(fetchUser());
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  return (
+    <BrowserRouter>
+      <AppRoutes />
+      <AuthModal />
+    </BrowserRouter>
+  );
+}
+
+function App() {
+  return (
+    <ErrorBoundary>
+      <AppInner />
+    </ErrorBoundary>
+  )
+}
+
+export default App
