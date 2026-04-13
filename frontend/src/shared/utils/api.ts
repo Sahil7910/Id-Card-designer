@@ -63,10 +63,17 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
   if (!res.ok) {
     let detail = "Something went wrong";
     try {
-      const err = await res.json();
-      detail = err.detail ?? detail;
+      const errBody = await res.json() as { detail?: unknown };
+      if (Array.isArray(errBody.detail)) {
+        // Pydantic v2 validation errors — extract first human-readable message
+        const first = (errBody.detail as { msg?: string }[])[0];
+        detail = first?.msg ?? "Validation error";
+      } else if (typeof errBody.detail === "string") {
+        detail = errBody.detail;
+      }
     } catch { /* non-JSON error body */ }
-    throw { status: res.status, detail } satisfies ApiError;
+    // Throw a real Error so Redux's miniSerializeError preserves the message
+    throw Object.assign(new Error(detail), { status: res.status });
   }
 
   if (res.status === 204) return undefined as T;

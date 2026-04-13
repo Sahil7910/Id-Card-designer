@@ -57,8 +57,8 @@ export default function ResetPassword() {
         navigate("/");
       }, 2000);
     } catch (err: unknown) {
-      const e = err as { detail?: string; message?: string };
-      setError(e?.detail ?? e?.message ?? "Something went wrong. Please try again.");
+      const e = err as { message?: string };
+      setError(e?.message ?? "Something went wrong. Please try again.");
     } finally {
       setLoading(false);
     }

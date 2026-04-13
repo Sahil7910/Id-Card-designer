@@ -84,13 +84,8 @@ function AuthModalInner({ mode, onClose, onSwitch }: { mode: AuthMode; onClose: 
       setSuccess(true);
       setTimeout(onClose, 1200);
     } catch (err: unknown) {
-      const errAny = err as { detail?: unknown; message?: string };
-      const detail = Array.isArray(errAny?.detail)
-        ? ((errAny.detail as { msg: string }[])[0]?.msg ?? "Validation error.")
-        : (errAny?.detail as string | undefined)
-          ?? errAny?.message
-          ?? "Something went wrong. Please try again.";
-      setError(detail);
+      const errAny = err as { message?: string };
+      setError(errAny?.message ?? "Something went wrong. Please try again.");
     } finally {
       setLoading(false);
     }
