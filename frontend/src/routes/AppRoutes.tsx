@@ -9,6 +9,7 @@ import AdminPricing from '../pages/Admin/AdminPricing';
 import AdminCardOptions from '../pages/Admin/AdminCardOptions';
 import AdminTemplates from '../pages/Admin/AdminTemplates';
 import TemplatesPage from '../pages/Templates/TemplatesPage';
+import ResetPassword from '../pages/ResetPassword';
 
 function NotFound() {
   return (
@@ -42,6 +43,7 @@ const AppRoutes = () => {
         <Route path="templates" element={<AdminTemplates />} />
       </Route>
       <Route path="/templates" element={<TemplatesPage />} />
+      <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   )

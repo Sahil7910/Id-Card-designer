@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAppDispatch, useAppSelector } from "../../app/hooks";
-import { login, register, authActions } from "../../features/auth/authSlice";
+import { login, register, forgotPassword, authActions } from "../../features/auth/authSlice";
 
 type AuthMode = "login" | "signup";
 interface AuthForm { name: string; email: string; password: string; confirm: string }
@@ -40,6 +40,12 @@ function AuthModalInner({ mode, onClose, onSwitch }: { mode: AuthMode; onClose: 
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Forgot password local state
+  const [view, setView] = useState<"auth" | "forgot" | "forgot-sent">("auth");
+  const [forgotEmail, setForgotEmail] = useState("");
+  const [forgotLoading, setForgotLoading] = useState(false);
+  const [forgotError, setForgotError] = useState("");
 
   useEffect(() => { setTimeout(() => inputRef.current?.focus(), 200); }, [mode]);
 
@@ -111,6 +117,62 @@ function AuthModalInner({ mode, onClose, onSwitch }: { mode: AuthMode; onClose: 
         <div style={{ padding: "36px 40px 40px", fontFamily: "'DM Sans', sans-serif", position: "relative" }}>
           <button onClick={onClose} style={{ position: "absolute", top: 18, right: 20, background: "rgba(255,255,255,0.06)", border: "none", color: "#64748b", borderRadius: 8, width: 32, height: 32, cursor: "pointer", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center" }}>✕</button>
 
+          {/* ── Forgot Password view ── */}
+          {view === "forgot" && (
+            <>
+              <button onClick={() => setView("auth")} style={{ background: "none", border: "none", color: "#64748b", cursor: "pointer", fontSize: 13, display: "flex", alignItems: "center", gap: 6, marginBottom: 24, padding: 0 }}>
+                ← Back to Sign In
+              </button>
+              <div style={{ marginBottom: 28 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "#e05c1a", letterSpacing: 2.5, marginBottom: 8, fontFamily: "'Bebas Neue', sans-serif" }}>ACCOUNT RECOVERY</div>
+                <h2 style={{ fontSize: 26, fontWeight: 900, color: "#f1f5f9", margin: 0, fontFamily: "'Playfair Display', serif", lineHeight: 1.2 }}>Reset your password</h2>
+                <p style={{ fontSize: 13, color: "#64748b", marginTop: 8, marginBottom: 0 }}>Enter your email and we'll send you a reset link.</p>
+              </div>
+              <AuthInput label="Email Address" type="email" value={forgotEmail}
+                onChange={e => { setForgotEmail(e.target.value); setForgotError(""); }}
+                placeholder="you@company.com" icon="✉️" />
+              {forgotError && (
+                <div style={{ background: "#7f1d1d22", border: "1px solid #ef444444", borderRadius: 8, padding: "10px 14px", marginTop: 12, fontSize: 12, color: "#ef4444", display: "flex", gap: 8, alignItems: "center" }}>
+                  ⚠️ {forgotError}
+                </div>
+              )}
+              <button
+                disabled={forgotLoading}
+                onClick={async () => {
+                  if (!forgotEmail.includes("@")) return setForgotError("Enter a valid email address.");
+                  setForgotLoading(true);
+                  try {
+                    await dispatch(forgotPassword(forgotEmail)).unwrap();
+                    setView("forgot-sent");
+                  } catch {
+                    setForgotError("Something went wrong. Please try again.");
+                  } finally {
+                    setForgotLoading(false);
+                  }
+                }}
+                style={{ width: "100%", marginTop: 20, padding: "14px 0", borderRadius: 10, border: "none", background: forgotLoading ? "#2a2f3e" : "linear-gradient(135deg, #e05c1a, #f97316)", color: forgotLoading ? "#64748b" : "#fff", fontWeight: 700, fontSize: 15, cursor: forgotLoading ? "not-allowed" : "pointer", letterSpacing: 0.5, display: "flex", alignItems: "center", justifyContent: "center", gap: 10, transition: "all 0.2s", boxShadow: forgotLoading ? "none" : "0 8px 24px rgba(224,92,26,0.35)" }}>
+                {forgotLoading ? <><LoadingSpinner /> Sending…</> : "Send Reset Link →"}
+              </button>
+            </>
+          )}
+
+          {/* ── Forgot Password sent view ── */}
+          {view === "forgot-sent" && (
+            <div style={{ textAlign: "center", padding: "12px 0 8px" }}>
+              <div style={{ width: 64, height: 64, borderRadius: "50%", background: "#16a34a22", border: "2px solid #16a34a", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px", fontSize: 28 }}>✓</div>
+              <div style={{ fontSize: 20, fontWeight: 700, color: "#e2e8f0", marginBottom: 10 }}>Check your email</div>
+              <div style={{ fontSize: 13, color: "#64748b", lineHeight: 1.7, marginBottom: 28 }}>
+                We sent a reset link to <strong style={{ color: "#e2e8f0" }}>{forgotEmail}</strong>.<br />
+                The link expires in 1 hour.
+              </div>
+              <button onClick={() => setView("auth")} style={{ background: "none", border: "1px solid rgba(255,255,255,0.12)", color: "#e2e8f0", borderRadius: 10, padding: "11px 28px", cursor: "pointer", fontSize: 13, fontWeight: 600 }}>
+                Back to Sign In
+              </button>
+            </div>
+          )}
+
+          {/* ── Login / Signup view ── */}
+          {view === "auth" && <>
           <div style={{ marginBottom: 28 }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: "#e05c1a", letterSpacing: 2.5, marginBottom: 8, fontFamily: "'Bebas Neue', sans-serif" }}>
               {mode === "login" ? "WELCOME BACK" : "GET STARTED"}
@@ -164,7 +226,7 @@ function AuthModalInner({ mode, onClose, onSwitch }: { mode: AuthMode; onClose: 
 
               {mode === "login" && (
                 <div style={{ textAlign: "right", marginTop: 8 }}>
-                  <button style={{ background: "none", border: "none", color: "#e05c1a", cursor: "pointer", fontSize: 12, fontWeight: 600 }}>Forgot password?</button>
+                  <button onClick={() => { setView("forgot"); setForgotError(""); }} style={{ background: "none", border: "none", color: "#e05c1a", cursor: "pointer", fontSize: 12, fontWeight: 600 }}>Forgot password?</button>
                 </div>
               )}
 
@@ -192,6 +254,7 @@ function AuthModalInner({ mode, onClose, onSwitch }: { mode: AuthMode; onClose: 
               </div>
             </>
           )}
+          </>}
         </div>
       </motion.div>
     </motion.div>

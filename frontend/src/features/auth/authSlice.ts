@@ -54,6 +54,13 @@ export const fetchUser = createAsyncThunk("auth/fetchUser", async () => {
   return user;
 });
 
+export const forgotPassword = createAsyncThunk(
+  "auth/forgotPassword",
+  async (email: string) => {
+    await api.post("/api/auth/forgot-password", { email });
+  },
+);
+
 // ── Slice ──────────────────────────────────────────────────────────
 const initialState: AuthState = {
   user: null,

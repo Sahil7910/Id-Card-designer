@@ -1,3 +1,4 @@
+import hashlib
 from datetime import datetime, timedelta, timezone
 
 import bcrypt
@@ -36,5 +37,30 @@ def decode_token(token: str) -> dict | None:
     try:
         payload = jwt.decode(token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
         return payload
+    except JWTError:
+        return None
+
+
+def create_reset_token(user_id: str, password_hash: str) -> str:
+    expire = datetime.now(timezone.utc) + timedelta(hours=1)
+    fp = hashlib.md5(password_hash.encode()).hexdigest()[:8]
+    return jwt.encode(
+        {"sub": user_id, "exp": expire, "type": "reset", "fp": fp},
+        settings.JWT_SECRET_KEY,
+        algorithm=settings.JWT_ALGORITHM,
+    )
+
+
+def verify_reset_token(token: str) -> tuple[str, str] | None:
+    """Returns (user_id, fingerprint) or None if invalid/expired."""
+    try:
+        payload = jwt.decode(token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
+        if payload.get("type") != "reset":
+            return None
+        user_id = payload.get("sub")
+        fp = payload.get("fp")
+        if not user_id or not fp:
+            return None
+        return (user_id, fp)
     except JWTError:
         return None

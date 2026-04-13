@@ -165,6 +165,97 @@ def _build_html(order: Order, recipient_name: str) -> str:
 </html>"""
 
 
+def _build_reset_html(recipient_name: str, reset_link: str) -> str:
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Reset Your Password</title>
+</head>
+<body style="margin:0;padding:0;background:#0f1117;font-family:'Segoe UI',Arial,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#0f1117;padding:40px 0;">
+  <tr><td align="center">
+    <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
+
+      <!-- Header -->
+      <tr><td style="background:#1a2035;border-radius:12px 12px 0 0;padding:32px 40px;text-align:center;">
+        <div style="font-size:22px;font-weight:700;color:#f97316;letter-spacing:1px;">🪪 ID Card Designer</div>
+        <div style="font-size:13px;color:#64748b;margin-top:4px;">Professional ID Card Printing</div>
+      </td></tr>
+
+      <!-- Body -->
+      <tr><td style="background:#13161d;padding:40px;text-align:center;">
+        <div style="font-size:40px;margin-bottom:16px;">🔒</div>
+        <div style="font-size:22px;font-weight:700;color:#e2e8f0;margin-bottom:12px;">Password Reset Request</div>
+        <div style="font-size:15px;color:#94a3b8;line-height:1.7;margin-bottom:32px;">
+          Hi {recipient_name},<br>
+          We received a request to reset your password. Click the button below to choose a new one.<br>
+          This link expires in <strong style="color:#e2e8f0;">1 hour</strong>.
+        </div>
+        <a href="{reset_link}"
+           style="display:inline-block;padding:14px 36px;background:linear-gradient(135deg,#e05c1a,#f97316);color:#fff;font-weight:700;font-size:15px;border-radius:10px;text-decoration:none;letter-spacing:0.5px;box-shadow:0 8px 24px rgba(224,92,26,0.35);">
+          Reset My Password →
+        </a>
+        <div style="margin-top:28px;font-size:13px;color:#475569;">
+          If you didn't request this, you can safely ignore this email.<br>
+          Your password will not change.
+        </div>
+      </td></tr>
+
+      <!-- Footer -->
+      <tr><td style="background:#1a2035;border-radius:0 0 12px 12px;padding:24px 40px;text-align:center;">
+        <div style="font-size:13px;color:#64748b;line-height:1.8;">
+          Questions? Reply to this email and we'll help you.<br>
+          <span style="color:#334155;">© 2025 ID Card Designer. All rights reserved.</span>
+        </div>
+      </td></tr>
+
+    </table>
+  </td></tr>
+</table>
+</body>
+</html>"""
+
+
+async def send_password_reset_email(
+    recipient_email: str,
+    recipient_name: str,
+    reset_link: str,
+) -> None:
+    """Send a password reset email. Never raises — failures are logged only."""
+    if not _smtp_configured():
+        logger.debug("SMTP not configured – skipping reset email for %s", recipient_email)
+        return
+
+    try:
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = "Reset Your Password – ID Card Designer"
+        msg["From"] = f"{settings.SMTP_FROM_NAME} <{settings.SMTP_FROM_EMAIL}>"
+        msg["To"] = recipient_email
+
+        plain = (
+            f"Hi {recipient_name},\n\n"
+            "We received a request to reset your ID Card Designer password.\n\n"
+            f"Reset your password here (link expires in 1 hour):\n{reset_link}\n\n"
+            "If you didn't request this, you can safely ignore this email."
+        )
+        msg.attach(MIMEText(plain, "plain"))
+        msg.attach(MIMEText(_build_reset_html(recipient_name, reset_link), "html"))
+
+        await aiosmtplib.send(
+            msg,
+            hostname=settings.SMTP_HOST,
+            port=settings.SMTP_PORT,
+            username=settings.SMTP_USER,
+            password=settings.SMTP_PASSWORD,
+            start_tls=True,
+        )
+
+        logger.info("Password reset email sent to %s", recipient_email)
+
+    except Exception as exc:
+        logger.error("Failed to send password reset email to %s: %s", recipient_email, exc, exc_info=True)
+
+
 async def send_order_confirmation(
     order: Order,
     recipient_email: str,

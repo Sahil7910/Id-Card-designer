@@ -1,15 +1,20 @@
+import hashlib
+
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from app.limiter import limiter
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import settings
 from app.database import get_db
 from app.dependencies import get_current_user
 from app.models.user import User
 from app.schemas.auth import (
+    ForgotPasswordRequest,
     LoginRequest,
     RefreshRequest,
     RegisterRequest,
+    ResetPasswordRequest,
     TokenResponse,
     UserResponse,
     UserUpdate,
@@ -17,10 +22,13 @@ from app.schemas.auth import (
 from app.services.auth_service import (
     create_access_token,
     create_refresh_token,
+    create_reset_token,
     decode_token,
     hash_password,
     verify_password,
+    verify_reset_token,
 )
+from app.services.email_service import send_password_reset_email
 
 router = APIRouter()
 
@@ -103,3 +111,38 @@ async def update_me(
         setattr(user, key, value)
     await db.flush()
     return user
+
+
+@router.post("/forgot-password", status_code=status.HTTP_200_OK)
+@limiter.limit("3/minute")
+async def forgot_password(request: Request, data: ForgotPasswordRequest, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(User).where(User.email == data.email))
+    user = result.scalar_one_or_none()
+    if user and user.is_active:
+        token = create_reset_token(user.id, user.password_hash)
+        reset_link = f"{settings.FRONTEND_URL}/reset-password?token={token}"
+        name = user.first_name or user.email
+        await send_password_reset_email(user.email, name, reset_link)
+    # Always return 200 to prevent email enumeration
+    return {"message": "If that email is registered, a reset link has been sent."}
+
+
+@router.post("/reset-password", status_code=status.HTTP_200_OK)
+async def reset_password(data: ResetPasswordRequest, db: AsyncSession = Depends(get_db)):
+    result = verify_reset_token(data.token)
+    if not result:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired reset link.")
+    user_id, fp = result
+
+    db_result = await db.execute(select(User).where(User.id == user_id))
+    user = db_result.scalar_one_or_none()
+    if not user or not user.is_active:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired reset link.")
+
+    current_fp = hashlib.md5(user.password_hash.encode()).hexdigest()[:8]
+    if current_fp != fp:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Reset link has already been used.")
+
+    user.password_hash = hash_password(data.new_password)
+    await db.flush()
+    return {"message": "Password updated successfully. You can now sign in."}
