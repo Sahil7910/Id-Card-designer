@@ -150,6 +150,38 @@ export default function IDCardDesigner() {
 
   const applyTemplate = (tpl: CardTemplate) => dispatch(designerActions.applyTemplate(tpl));
 
+  // Keyboard arrow-key handler: pan photo image or move any field
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!selectedFieldId) return;
+      if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].indexOf(e.key) === -1) return;
+      // Don't intercept when typing in an input/textarea
+      if (document.activeElement && ["INPUT", "TEXTAREA", "SELECT"].includes((document.activeElement as HTMLElement).tagName)) return;
+      e.preventDefault();
+      const fields = designingSide === "front" ? frontFields : backFields;
+      const field = fields.find(f => f.id === selectedFieldId);
+      if (!field) return;
+      const step = e.shiftKey ? 5 : 1;
+      const dx = e.key === "ArrowLeft" ? -step : e.key === "ArrowRight" ? step : 0;
+      const dy = e.key === "ArrowUp" ? -step : e.key === "ArrowDown" ? step : 0;
+      if (field.type === "photo") {
+        // Arrow keys pan the image inside the field
+        updateField(field.id, {
+          imageOffsetX: Math.round(Math.max(-50, Math.min(50, (field.imageOffsetX ?? 0) + dx))),
+          imageOffsetY: Math.round(Math.max(-50, Math.min(50, (field.imageOffsetY ?? 0) + dy))),
+        });
+      } else {
+        // Arrow keys move the field position on the canvas
+        updateField(field.id, {
+          x: Math.round(Math.max(0, Math.min(90, field.x + dx))),
+          y: Math.round(Math.max(0, Math.min(90, field.y + dy))),
+        });
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [selectedFieldId, designingSide, frontFields, backFields]);
+
   const handleTemplateUpload = async (file: File, side: "front" | "back") => {
     const fd = new FormData();
     fd.append("file", file, file.name);
@@ -625,11 +657,22 @@ export default function IDCardDesigner() {
                           <div style={{ position: "absolute", bottom: 6, left: 6, background: "#16a34a", borderRadius: 4, padding: "2px 7px", fontSize: 9, fontWeight: 700, color: "#fff" }}>{"\u2713"} Photo uploaded</div>
                         </div>
                       ) : (
-                        <div style={{ background: "#13161d", border: "2px dashed #6366f133", borderRadius: 8, padding: "14px 10px", marginBottom: 12, textAlign: "center" }}>
-                          <div style={{ fontSize: 20, opacity: 0.3, marginBottom: 6 }}>{"\u{1F464}"}</div>
-                          <div style={{ fontSize: 11, color: "#6366f1", fontWeight: 600, marginBottom: 3 }}>Click the photo frame</div>
-                          <div style={{ fontSize: 10, color: "#475569" }}>Tap it on the canvas to open file picker</div>
-                        </div>
+                        <label style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 8, border: "2px dashed #6366f133", background: "#13161d", cursor: "pointer", marginBottom: 12 }}>
+                          <span style={{ fontSize: 20, opacity: 0.4 }}>{"\u{1F464}"}</span>
+                          <div>
+                            <div style={{ fontSize: 11, color: "#6366f1", fontWeight: 600, marginBottom: 2 }}>Upload Photo</div>
+                            <div style={{ fontSize: 9, color: "#475569" }}>Click here or click the photo frame on canvas</div>
+                          </div>
+                          <input type="file" accept="image/*" style={{ display: "none" }}
+                            onChange={e => {
+                              const file = e.target.files?.[0];
+                              if (!file) return;
+                              const reader = new FileReader();
+                              reader.onload = ev => updateField(selectedField.id, { imageUrl: ev.target?.result as string });
+                              reader.readAsDataURL(file);
+                              e.target.value = "";
+                            }} />
+                        </label>
                       )}
 
                       <div style={{ height: 1, background: "#2a2f3e", margin: "0 0 12px" }} />
@@ -714,21 +757,10 @@ export default function IDCardDesigner() {
                           })}
                         </div>
                       </FieldRow>
-                      <FieldRow label={`Zoom: ${(selectedField.imageScale ?? 1).toFixed(1)}×`}>
-                        <input type="range" min={50} max={300} step={5} value={Math.round((selectedField.imageScale ?? 1) * 100)}
-                          onChange={e => updateField(selectedField.id, { imageScale: parseInt(e.target.value) / 100 })}
-                          style={{ width: "100%", accentColor: "#6366f1" }} />
-                      </FieldRow>
-                      <FieldRow label={`Pan X: ${selectedField.imageOffsetX ?? 0}%`}>
-                        <input type="range" min={-50} max={50} value={selectedField.imageOffsetX ?? 0}
-                          onChange={e => updateField(selectedField.id, { imageOffsetX: parseInt(e.target.value) })}
-                          style={{ width: "100%", accentColor: "#6366f1" }} />
-                      </FieldRow>
-                      <FieldRow label={`Pan Y: ${selectedField.imageOffsetY ?? 0}%`}>
-                        <input type="range" min={-50} max={50} value={selectedField.imageOffsetY ?? 0}
-                          onChange={e => updateField(selectedField.id, { imageOffsetY: parseInt(e.target.value) })}
-                          style={{ width: "100%", accentColor: "#6366f1" }} />
-                      </FieldRow>
+                      <div style={{ background: "#13161d", border: "1px solid #2a2f3e", borderRadius: 7, padding: "8px 10px", display: "flex", flexDirection: "column", gap: 4 }}>
+                        <div style={{ fontSize: 9, color: "#6366f1", fontWeight: 700, letterSpacing: 0.5 }}>🖱 Scroll on photo to zoom</div>
+                        <div style={{ fontSize: 9, color: "#64748b" }}>⬆⬇⬅➡ Arrow keys to pan image</div>
+                      </div>
                     </>
                   )}
 
@@ -812,13 +844,13 @@ export default function IDCardDesigner() {
                       </span>
                     )}
                   </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", boxSizing: "border-box" }}>
                     <button onClick={() => dispatch(designerActions.decrementQuantity())}
                       style={{ width: 34, height: 34, borderRadius: 7, border: "1px solid #2a2f3e", background: "#13161d", color: "#94a3b8", cursor: "pointer", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "all 0.15s" }}
                       onMouseEnter={e => { e.currentTarget.style.borderColor = "#e05c1a55"; e.currentTarget.style.color = "#e05c1a"; }}
                       onMouseLeave={e => { e.currentTarget.style.borderColor = "#2a2f3e"; e.currentTarget.style.color = "#94a3b8"; }}>{"\u2212"}</button>
-                    <input type="number" value={quantity} min={10} onChange={e => dispatch(designerActions.setQuantity(parseInt(e.target.value) || 10))}
-                      style={{ flex: 1, background: "#13161d", border: "1px solid #2a2f3e", color: "#e2e8f0", borderRadius: 7, padding: "8px 10px", fontSize: 14, outline: "none", textAlign: "center", fontWeight: 700 }} />
+                    <input type="number" value={quantity} min={25} onChange={e => dispatch(designerActions.setQuantity(parseInt(e.target.value) || 25))}
+                      style={{ flex: 1, minWidth: 0, background: "#13161d", border: "1px solid #2a2f3e", color: "#e2e8f0", borderRadius: 7, padding: "8px 10px", fontSize: 14, outline: "none", textAlign: "center", fontWeight: 700 }} />
                     <button onClick={() => dispatch(designerActions.incrementQuantity())}
                       style={{ width: 34, height: 34, borderRadius: 7, border: "1px solid #2a2f3e", background: "#13161d", color: "#94a3b8", cursor: "pointer", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "all 0.15s" }}
                       onMouseEnter={e => { e.currentTarget.style.borderColor = "#e05c1a55"; e.currentTarget.style.color = "#e05c1a"; }}
@@ -835,7 +867,7 @@ export default function IDCardDesigner() {
                       <div key={tier.min} style={{ flex: 1, height: 3, borderRadius: 2, background: quantity >= tier.min ? tier.color : "#2a2f3e", transition: "background 0.3s" }} />
                     ))}
                   </div>
-                  <p style={{ fontSize: 9, color: "#475569", margin: "5px 0 0" }}>Min. 10 {"\u00B7"} Bulk discounts from 50+ cards</p>
+                  <p style={{ fontSize: 9, color: "#475569", margin: "5px 0 0" }}>Min. 25 {"\u00B7"} Bulk discounts from 50+ cards</p>
                 </div>
               </div>
 
@@ -854,7 +886,7 @@ export default function IDCardDesigner() {
                 <p style={{ fontSize: 10, color: "#475569", margin: "5px 0 0" }}>Select chip type for your Inkjet cards.</p>
               </FieldRow>
               <FieldRow label="Quantity">
-                <input type="number" value={quantity} min={10} onChange={e => dispatch(designerActions.setQuantity(parseInt(e.target.value) || 10))}
+                <input type="number" value={quantity} min={25} onChange={e => dispatch(designerActions.setQuantity(parseInt(e.target.value) || 25))}
                   style={{ width: "100%", background: "#13161d", border: "1px solid #2a2f3e", color: "#e2e8f0", borderRadius: 7, padding: "9px 12px", fontSize: 14, outline: "none", boxSizing: "border-box" }} />
               </FieldRow>
               <button onClick={placeOrder} style={{ width: "100%", background: "#e05c1a", border: "none", color: "#fff", borderRadius: 8, padding: "13px 0", cursor: "pointer", fontWeight: 700, fontSize: 14, letterSpacing: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
@@ -951,6 +983,7 @@ export default function IDCardDesigner() {
                     onCardClick={() => { if (printSide === "Both Sides") { dispatch(designerActions.setDesigningSide("front")); } }}
                     printSide={printSide}
                     onPhotoUpload={(fieldId, dataUrl) => updateField(fieldId, { imageUrl: dataUrl })}
+                    onImageUpdate={(fieldId, updates) => updateField(fieldId, updates)}
                     bgSvg={frontBg} bgUrl={frontBgUrl}
                     onTemplateUpload={file => handleTemplateUpload(file, "front")}
                     onRemoveBackground={() => dispatch(designerActions.setFrontBg({ url: "" }))} />
@@ -965,6 +998,7 @@ export default function IDCardDesigner() {
                       onCardClick={() => dispatch(designerActions.setDesigningSide("back"))}
                       printSide={printSide}
                       onPhotoUpload={(fieldId, dataUrl) => updateField(fieldId, { imageUrl: dataUrl })}
+                      onImageUpdate={(fieldId, updates) => updateField(fieldId, updates)}
                       bgSvg={backBg} bgUrl={backBgUrl}
                       onTemplateUpload={file => handleTemplateUpload(file, "back")}
                       onRemoveBackground={() => dispatch(designerActions.setBackBg({ url: "" }))} />
@@ -975,7 +1009,7 @@ export default function IDCardDesigner() {
                     {"\u2726"} Drag to move {"\u00B7"} Drag corners/edges to resize {"\u00B7"} Click to select &amp; edit properties
                   </div>
                 )}
-                <div style={{ background: "#1a1e28", border: "1px solid #2a2f3e", borderRadius: 10, padding: "14px 18px", maxWidth: 560 }}>
+                <div style={{ background: "#1a1e28", border: "1px solid #2a2f3e", borderRadius: 10, padding: "14px 18px", maxWidth: 560, marginLeft: "auto", marginRight: "auto" }}>
                   <div style={{ fontSize: 10, fontWeight: 700, color: "#64748b", letterSpacing: 1.5, marginBottom: 12 }}>SPECIFICATIONS</div>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "7px 24px" }}>
                     {[["Quantity", `${quantity} cards`], ["Size", "Standard (87 mm \u00D7 57 mm)"], ["Material", material], ["Finish", finish.toUpperCase()], ["Printer", printer.toUpperCase()], ["Chip", chipType], ["Print Side", printSide.split(" ")[0]], ["Orientation", orientation]].map(([k, v]) => (

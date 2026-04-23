@@ -83,7 +83,7 @@ const initialState: DesignerState = {
   chipType: "LED",
   finish: "Matte",
   material: "PVC Plastic",
-  quantity: 10,
+  quantity: 25,
   activeTab: "CONTENT",
   designingSide: "front",
   selectedFieldId: null,
@@ -149,13 +149,13 @@ export const designerSlice = createSlice({
       state.material = action.payload;
     },
     setQuantity(state, action: PayloadAction<number>) {
-      state.quantity = Math.max(10, action.payload);
+      state.quantity = Math.max(25, action.payload);
     },
     incrementQuantity(state) {
-      state.quantity += 10;
+      state.quantity += 25;
     },
     decrementQuantity(state) {
-      state.quantity = Math.max(10, state.quantity - 10);
+      state.quantity = Math.max(25, state.quantity - 25);
     },
     setActiveTab(state, action: PayloadAction<"CONTENT" | "TEMPLATE">) {
       state.activeTab = action.payload;

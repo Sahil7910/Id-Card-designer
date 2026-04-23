@@ -70,10 +70,15 @@ export function DraggableField({ field, isSelected, onMouseDown, onResizeDown, i
         </>
       )}
 
-      {/* ── Photo / Logo ── */}
+      {/* ── Photo ── */}
       {isPhotoLike ? (
         <div
-          onClick={e => { if (isEditable) { e.stopPropagation(); fileInputRef.current?.click(); } }}
+          ref={photoRef}
+          onClick={e => {
+            e.stopPropagation();
+            // Only open file picker when no image uploaded yet
+            if (isEditable && !field.imageUrl) fileInputRef.current?.click();
+          }}
           style={{
             width: "100%", height: "100%",
             position: "relative",
@@ -88,7 +93,7 @@ export function DraggableField({ field, isSelected, onMouseDown, onResizeDown, i
             overflow: "hidden",
             display: "flex", alignItems: "center", justifyContent: "center",
             minHeight: 40,
-            cursor: isEditable ? "pointer" : "default",
+            cursor: isEditable ? (field.imageUrl ? "grab" : "pointer") : "default",
           }}
         >
           {field.imageUrl ? (
@@ -102,6 +107,7 @@ export function DraggableField({ field, isSelected, onMouseDown, onResizeDown, i
                 transformOrigin: "center center",
                 transform: `scale(${field.imageScale ?? 1}) translate(${field.imageOffsetX ?? 0}%, ${field.imageOffsetY ?? 0}%)`,
                 display: "block",
+                pointerEvents: "none",
               }}
             />
           ) : (
