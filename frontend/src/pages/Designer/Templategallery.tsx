@@ -91,10 +91,11 @@ function mapApiTemplate(t: TemplateApiItem): CardTemplate {
 }
 
 // ── Template Page ──────────────────────────────────────────────────
-export default function TemplatePage({ isHorizontal: _isHorizontal, onApply, onClose }: {
+export default function TemplatePage({ isHorizontal: _isHorizontal, onApply, onClose, onCreateTemplate }: {
   isHorizontal: boolean;
   onApply: (t: CardTemplate) => void;
   onClose: () => void;
+  onCreateTemplate?: () => void;
 }) {
   const isLoggedIn = useSelector((s: RootState) => !!s.auth.user);
 
@@ -205,16 +206,36 @@ export default function TemplatePage({ isHorizontal: _isHorizontal, onApply, onC
         <div style={{ flex: 1, overflowY: "auto", padding: "22px 28px" }}>
           {activeTab === "mine" && myLoading ? (
             <div style={{ textAlign: "center", padding: 60, color: "#475569", fontSize: 14 }}>Loading your templates…</div>
+          ) : activeTab === "mine" ? (
+            filtered.length === 0 ? (
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(270px, 1fr))", gap: 20 }}>
+                {onCreateTemplate && (
+                  <WhiteboardCard onCreateTemplate={onCreateTemplate} />
+                )}
+              </div>
+            ) : (
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(270px, 1fr))", gap: 20 }}>
+                {onCreateTemplate && (
+                  <WhiteboardCard onCreateTemplate={onCreateTemplate} />
+                )}
+                {filtered.map(tpl => (
+                  <TemplateCard
+                    key={tpl.id} tpl={tpl}
+                    isHovered={hoveredId === tpl.id} isPreviewing={previewId === tpl.id}
+                    onHover={setHoveredId}
+                    onPreview={id => { setPreviewId(id); setPreviewSide("front"); }}
+                    onApply={onApply}
+                    canDelete={true}
+                    isDeleting={deletingId === tpl.id}
+                    onDelete={handleDeleteMyTemplate}
+                  />
+                ))}
+              </div>
+            )
           ) : filtered.length === 0 ? (
             <div style={{ textAlign: "center", padding: 60 }}>
-              <div style={{ fontSize: 40, marginBottom: 12, opacity: 0.3 }}>
-                {activeTab === "mine" ? "📋" : "🗂"}
-              </div>
-              <div style={{ color: "#475569", fontSize: 14 }}>
-                {activeTab === "mine"
-                  ? "You haven't saved any templates yet. Use the \"Save as Template\" button in the designer!"
-                  : "No templates in this category yet."}
-              </div>
+              <div style={{ fontSize: 40, marginBottom: 12, opacity: 0.3 }}>🗂</div>
+              <div style={{ color: "#475569", fontSize: 14 }}>No templates in this category yet.</div>
             </div>
           ) : (
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(270px, 1fr))", gap: 20 }}>
@@ -225,7 +246,7 @@ export default function TemplatePage({ isHorizontal: _isHorizontal, onApply, onC
                   onHover={setHoveredId}
                   onPreview={id => { setPreviewId(id); setPreviewSide("front"); }}
                   onApply={onApply}
-                  canDelete={activeTab === "mine"}
+                  canDelete={false}
                   isDeleting={deletingId === tpl.id}
                   onDelete={handleDeleteMyTemplate}
                 />
@@ -279,6 +300,32 @@ export default function TemplatePage({ isHorizontal: _isHorizontal, onApply, onC
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+// ── Whiteboard Card ────────────────────────────────────────────────
+function WhiteboardCard({ onCreateTemplate }: { onCreateTemplate: () => void }) {
+  const [hovered, setHovered] = useState(false);
+  return (
+    <div
+      onClick={onCreateTemplate}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        border: `2px dashed ${hovered ? "#e05c1a" : "#e05c1a55"}`,
+        borderRadius: 12,
+        background: hovered ? "#1e2330" : "#13161d",
+        cursor: "pointer",
+        display: "flex", flexDirection: "column",
+        alignItems: "center", justifyContent: "center",
+        minHeight: 192, gap: 10,
+        transition: "border-color 0.2s, background 0.2s",
+      }}
+    >
+      <span style={{ fontSize: 32, opacity: 0.4 }}>🗒️</span>
+      <span style={{ fontSize: 12, fontWeight: 700, color: "#e05c1a", letterSpacing: 0.5 }}>+ Design Template</span>
+      <span style={{ fontSize: 10, color: "#475569", textAlign: "center", maxWidth: 110 }}>Start with a blank card</span>
     </div>
   );
 }

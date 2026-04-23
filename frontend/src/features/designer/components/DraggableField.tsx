@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { CardField, RHandle } from "../../../shared/types";
 import { TEXT_TYPES } from "../../../shared/types";
 import { FIELD_COLORS, HANDLES } from "../constants";
@@ -13,9 +13,10 @@ interface DraggableFieldProps {
   isEditable: boolean;
   onPhotoUpload?: (fieldId: string, dataUrl: string) => void;
   onImageUpdate?: (fieldId: string, updates: Partial<Pick<CardField, "imageScale" | "imageOffsetX" | "imageOffsetY">>) => void;
+  onLabelChange?: (fieldId: string, label: string) => void;
 }
 
-export function DraggableField({ field, isSelected, onMouseDown, onResizeDown, isEditable, onPhotoUpload, onImageUpdate }: DraggableFieldProps) {
+export function DraggableField({ field, isSelected, onMouseDown, onResizeDown, isEditable, onPhotoUpload, onImageUpdate, onLabelChange }: DraggableFieldProps) {
   const color = FIELD_COLORS[field.type];
   const isText = TEXT_TYPES.includes(field.type);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -23,6 +24,7 @@ export function DraggableField({ field, isSelected, onMouseDown, onResizeDown, i
   const fieldRef = useRef(field);
   fieldRef.current = field;
   const isPhotoLike = field.type === "photo";
+  const [editing, setEditing] = useState(false);
 
   // Non-passive wheel listener for scroll-to-zoom
   useEffect(() => {
@@ -156,19 +158,46 @@ export function DraggableField({ field, isSelected, onMouseDown, onResizeDown, i
         </div>
 
       /* ── Text ── */
+      ) : editing && isEditable && onLabelChange ? (
+        <input
+          autoFocus
+          value={field.label}
+          onChange={e => onLabelChange(field.id, e.target.value)}
+          onBlur={() => setEditing(false)}
+          onKeyDown={e => { if (e.key === "Enter" || e.key === "Escape") setEditing(false); e.stopPropagation(); }}
+          onClick={e => e.stopPropagation()}
+          onMouseDown={e => e.stopPropagation()}
+          style={{
+            width: "100%",
+            fontSize: field.fontSize ?? 11,
+            fontWeight: field.bold ? 700 : 400,
+            fontStyle: field.italic ? "italic" : "normal",
+            textDecoration: field.underline ? "underline" : "none",
+            fontFamily: field.fontFamily ?? "inherit",
+            color: field.color ?? "#1e293b",
+            textAlign: field.align ?? "left",
+            background: "#ffffffcc",
+            border: `1px solid ${color}`,
+            borderRadius: 3, padding: "1px 4px", lineHeight: 1.4,
+            outline: "none", boxSizing: "border-box",
+          }}
+        />
       ) : (
-        <div style={{
-          fontSize: field.fontSize ?? 11,
-          fontWeight: field.bold ? 700 : 400,
-          fontStyle: field.italic ? "italic" : "normal",
-          textDecoration: field.underline ? "underline" : "none",
-          fontFamily: field.fontFamily ?? "inherit",
-          color: field.color ?? "#1e293b",
-          textAlign: field.align ?? "left",
-          background: isSelected && isEditable ? color + "0c" : "transparent",
-          borderRadius: 3, padding: "2px 4px", lineHeight: 1.4,
-          whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
-        }}>
+        <div
+          onDoubleClick={e => { if (isEditable && onLabelChange) { e.stopPropagation(); setEditing(true); } }}
+          style={{
+            fontSize: field.fontSize ?? 11,
+            fontWeight: field.bold ? 700 : 400,
+            fontStyle: field.italic ? "italic" : "normal",
+            textDecoration: field.underline ? "underline" : "none",
+            fontFamily: field.fontFamily ?? "inherit",
+            color: field.color ?? "#1e293b",
+            textAlign: field.align ?? "left",
+            background: isSelected && isEditable ? color + "0c" : "transparent",
+            borderRadius: 3, padding: "2px 4px", lineHeight: 1.4,
+            whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+            cursor: isEditable ? "text" : "default",
+          }}>
           {field.label}
         </div>
       )}

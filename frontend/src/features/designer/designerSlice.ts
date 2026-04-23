@@ -316,6 +316,19 @@ export const designerSlice = createSlice({
       if (d) d.name = action.payload.name;
       persist(state);
     },
+    clearDesign(state) {
+      const d = getActive(state);
+      if (!d) return;
+      d.frontFields = [];
+      d.backFields = [];
+      d.frontBg = "";
+      d.backBg = "";
+      d.frontBgUrl = "";
+      d.backBgUrl = "";
+      state.selectedFieldId = null;
+      syncActive(state);
+      persist(state);
+    },
   },
 });
 

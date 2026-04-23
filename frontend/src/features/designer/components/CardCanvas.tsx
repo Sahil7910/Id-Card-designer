@@ -23,13 +23,14 @@ interface CardCanvasProps {
   onTemplateUpload?: (file: File) => void;
   onRemoveBackground?: () => void;
   onImageUpdate?: (fieldId: string, updates: Partial<Pick<import("../../../shared/types").CardField, "imageScale" | "imageOffsetX" | "imageOffsetY">>) => void;
+  onLabelChange?: (fieldId: string, label: string) => void;
 }
 
 import { API_BASE as CANVAS_API_BASE } from "../../../shared/utils/apiBase";
 
 export function CardCanvas({
   label, side, isActive, isEditing, fields, cardW, cardH,
-  cardRef, onMouseDown, onResizeDown, selectedFieldId, onCardClick, printSide, onPhotoUpload, bgSvg, bgUrl, onTemplateUpload, onRemoveBackground, onImageUpdate,
+  cardRef, onMouseDown, onResizeDown, selectedFieldId, onCardClick, printSide, onPhotoUpload, bgSvg, bgUrl, onTemplateUpload, onRemoveBackground, onImageUpdate, onLabelChange,
 }: CardCanvasProps) {
   const accent = side === "front" ? "#e05c1a" : "#6366f1";
   const fullBgUrl = bgUrl ? `${CANVAS_API_BASE}${bgUrl}` : undefined;
@@ -89,7 +90,7 @@ export function CardCanvas({
 
         {fields.map(field => (
           <DraggableField key={field.id} field={field} isSelected={selectedFieldId === field.id}
-            onMouseDown={onMouseDown} onResizeDown={onResizeDown} isEditable={isEditing} onPhotoUpload={onPhotoUpload} onImageUpdate={onImageUpdate} />
+            onMouseDown={onMouseDown} onResizeDown={onResizeDown} isEditable={isEditing} onPhotoUpload={onPhotoUpload} onImageUpdate={onImageUpdate} onLabelChange={onLabelChange} />
         ))}
         {!isEditing && printSide === "Both Sides" && (
           <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.04)", borderRadius: 14, display: "flex", alignItems: "flex-end", justifyContent: "flex-end", padding: 10, pointerEvents: "none" }}>

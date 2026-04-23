@@ -560,10 +560,54 @@ export default function IDCardDesigner() {
                 <div style={{ background: "#1e2330", border: "1px solid #e05c1a33", borderRadius: 10, padding: 12 }}>
                   <div style={{ fontSize: 10, fontWeight: 700, color: "#e05c1a", letterSpacing: 1.5, marginBottom: 10 }}>FIELD PROPERTIES</div>
 
-                  <FieldRow label="Label Text">
+                  {/* Field label rename */}
+                  <div style={{ marginBottom: 12 }}>
+                    <div style={{ fontSize: 9, fontWeight: 700, color: "#64748b", letterSpacing: 1, marginBottom: 5 }}>FIELD NAME</div>
                     <input value={selectedField.label} onChange={e => updateField(selectedField.id, { label: e.target.value })}
-                      style={{ width: "100%", background: "#13161d", border: "1px solid #2a2f3e", color: "#e2e8f0", borderRadius: 6, padding: "7px 10px", fontSize: 12, outline: "none", boxSizing: "border-box", fontFamily: selectedField.fontFamily ?? "inherit" }} />
-                  </FieldRow>
+                      style={{ width: "100%", background: "#13161d", border: "1px solid #e05c1a55", color: "#e2e8f0", borderRadius: 6, padding: "8px 10px", fontSize: 13, fontWeight: 600, outline: "none", boxSizing: "border-box", fontFamily: selectedField.fontFamily ?? "inherit" }} />
+                  </div>
+
+                  {/* Align to another field */}
+                  {(() => {
+                    const otherFields = fields.filter(f => f.id !== selectedField.id);
+                    if (otherFields.length === 0) return null;
+                    return (
+                      <div style={{ marginBottom: 12 }}>
+                        <div style={{ fontSize: 9, fontWeight: 700, color: "#64748b", letterSpacing: 1, marginBottom: 6 }}>ALIGN TO FIELD</div>
+                        <select
+                          id="align-ref-select"
+                          defaultValue=""
+                          style={{ width: "100%", background: "#13161d", border: "1px solid #2a2f3e", color: "#94a3b8", borderRadius: 6, padding: "6px 8px", fontSize: 11, marginBottom: 6, outline: "none", boxSizing: "border-box" }}>
+                          <option value="" disabled>Select reference field…</option>
+                          {otherFields.map(f => <option key={f.id} value={f.id}>{f.label}</option>)}
+                        </select>
+                        <div style={{ display: "flex", gap: 3 }}>
+                          {([
+                            { label: "⬅ Left",   title: "Match left edge",       apply: (ref: typeof selectedField) => ({ x: ref.x }) },
+                            { label: "↔ Center", title: "Match horizontal center",apply: (ref: typeof selectedField) => ({ x: Math.round(ref.x + (ref.width - selectedField.width) / 2) }) },
+                            { label: "Right ➡", title: "Match right edge",       apply: (ref: typeof selectedField) => ({ x: Math.round(ref.x + ref.width - selectedField.width) }) },
+                            { label: "⬆ Top",    title: "Match top edge",        apply: (ref: typeof selectedField) => ({ y: ref.y }) },
+                            { label: "↕ Mid",    title: "Match vertical center", apply: (ref: typeof selectedField) => ({ y: Math.round(ref.y + (ref.height - selectedField.height) / 2) }) },
+                            { label: "Bot ⬇",   title: "Match bottom edge",     apply: (ref: typeof selectedField) => ({ y: Math.round(ref.y + ref.height - selectedField.height) }) },
+                          ]).map(a => (
+                            <button key={a.title} title={a.title}
+                              onClick={() => {
+                                const sel = document.getElementById("align-ref-select") as HTMLSelectElement;
+                                const refId = sel?.value;
+                                const ref = otherFields.find(f => f.id === refId);
+                                if (!ref) return;
+                                updateField(selectedField.id, a.apply(ref));
+                              }}
+                              style={{ flex: 1, padding: "4px 1px", borderRadius: 5, border: "1px solid #2a2f3e", background: "#13161d", color: "#94a3b8", cursor: "pointer", fontSize: 8, fontWeight: 600, whiteSpace: "nowrap" }}
+                              onMouseEnter={e => { e.currentTarget.style.borderColor = "#e05c1a66"; e.currentTarget.style.color = "#e05c1a"; }}
+                              onMouseLeave={e => { e.currentTarget.style.borderColor = "#2a2f3e"; e.currentTarget.style.color = "#94a3b8"; }}>
+                              {a.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })()}
 
                   {TEXT_TYPES.includes(selectedField.type) && (
                     <>
@@ -902,6 +946,10 @@ export default function IDCardDesigner() {
             isHorizontal={isHorizontal}
             onApply={applyTemplate}
             onClose={() => dispatch(designerActions.setActiveTab("CONTENT"))}
+            onCreateTemplate={isAuthenticated ? () => {
+              dispatch(designerActions.clearDesign());
+              dispatch(designerActions.setActiveTab("CONTENT"));
+            } : undefined}
           />
         ) : (
           <div style={{ flex: 1, display: "flex", flexDirection: "column", overflowY: "auto" }}
@@ -980,13 +1028,14 @@ export default function IDCardDesigner() {
                     cardRef={frontCardRef}
                     onMouseDown={handleMouseDown} onResizeDown={handleResizeDown}
                     selectedFieldId={designingSide === "front" ? selectedFieldId : null}
-                    onCardClick={() => { if (printSide === "Both Sides") { dispatch(designerActions.setDesigningSide("front")); } }}
+                    onCardClick={() => { dispatch(designerActions.selectField(null)); if (printSide === "Both Sides") { dispatch(designerActions.setDesigningSide("front")); } }}
                     printSide={printSide}
                     onPhotoUpload={(fieldId, dataUrl) => updateField(fieldId, { imageUrl: dataUrl })}
                     onImageUpdate={(fieldId, updates) => updateField(fieldId, updates)}
                     bgSvg={frontBg} bgUrl={frontBgUrl}
                     onTemplateUpload={file => handleTemplateUpload(file, "front")}
-                    onRemoveBackground={() => dispatch(designerActions.setFrontBg({ url: "" }))} />
+                    onRemoveBackground={() => dispatch(designerActions.setFrontBg({ url: "" }))}
+                    onLabelChange={(fieldId, label) => updateField(fieldId, { label })} />
                   {printSide === "Both Sides" && (
                     <CardCanvas label="BACK" side="back"
                       isActive={designingSide === "back"}
@@ -995,13 +1044,14 @@ export default function IDCardDesigner() {
                       cardRef={backCardRef}
                       onMouseDown={handleMouseDown} onResizeDown={handleResizeDown}
                       selectedFieldId={designingSide === "back" ? selectedFieldId : null}
-                      onCardClick={() => dispatch(designerActions.setDesigningSide("back"))}
+                      onCardClick={() => { dispatch(designerActions.selectField(null)); dispatch(designerActions.setDesigningSide("back")); }}
                       printSide={printSide}
                       onPhotoUpload={(fieldId, dataUrl) => updateField(fieldId, { imageUrl: dataUrl })}
                       onImageUpdate={(fieldId, updates) => updateField(fieldId, updates)}
                       bgSvg={backBg} bgUrl={backBgUrl}
                       onTemplateUpload={file => handleTemplateUpload(file, "back")}
-                      onRemoveBackground={() => dispatch(designerActions.setBackBg({ url: "" }))} />
+                      onRemoveBackground={() => dispatch(designerActions.setBackBg({ url: "" }))}
+                      onLabelChange={(fieldId, label) => updateField(fieldId, { label })} />
                   )}
                 </div>
                 {(frontFields.length > 0 || backFields.length > 0) && (
