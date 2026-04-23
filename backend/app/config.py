@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     SMTP_FROM_NAME: str = "ID Card Designer"
     SMTP_FROM_EMAIL: str = "print.sensedge@gmail.com"
     FRONTEND_URL: str = "http://localhost:5173"
+    GOOGLE_CLIENT_ID: str = ""
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 

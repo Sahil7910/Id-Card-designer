@@ -9,6 +9,12 @@ from slowapi.middleware import SlowAPIMiddleware
 from app.config import settings
 from app.limiter import limiter
 from app.routers import admin, auth, designs, orders, pricing, templates, uploads
+from app.routers import design_queue, print_queue, shipping_queue
+
+# Import new models so Alembic / SQLAlchemy metadata picks them up
+import app.models.audit_log  # noqa: F401
+import app.models.order_attachment  # noqa: F401
+import app.models.order_serial_counter  # noqa: F401
 
 app = FastAPI(
     title="ID Card Designer API",
@@ -46,6 +52,9 @@ app.include_router(orders.router, prefix="/api/orders", tags=["Orders"])
 app.include_router(uploads.router, prefix="/api/uploads", tags=["Uploads"])
 app.include_router(pricing.router, prefix="/api/pricing", tags=["Pricing"])
 app.include_router(admin.router, prefix="/api/admin", tags=["Admin"])
+app.include_router(design_queue.router, prefix="/api/design-queue", tags=["Design Queue"])
+app.include_router(print_queue.router, prefix="/api/print-queue", tags=["Print Queue"])
+app.include_router(shipping_queue.router, prefix="/api/shipping-queue", tags=["Shipping Queue"])
 
 app.mount("/uploads", StaticFiles(directory=settings.UPLOAD_DIR), name="uploads")
 

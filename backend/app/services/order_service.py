@@ -1,22 +1,85 @@
-import secrets
+import random
 import string
+import uuid
 from decimal import Decimal
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models.audit_log import OrderAuditLog
 from app.models.order import Order, OrderItem
+from app.models.order_serial_counter import OrderSerialCounter
+from app.models.user import User
 from app.schemas.order import OrderCreate
 from app.services.email_service import send_order_confirmation
 from app.services.pricing_service import calc_order_total, calc_total, calc_unit_price, get_pricing_config
 
 
-def generate_order_number() -> str:
-    chars = string.ascii_uppercase + string.digits
-    random_part = "".join(secrets.choice(chars) for _ in range(6))
-    return f"ORD-{random_part}"
+# ── Customer Code & Order Number ───────────────────────────────────────────────
 
+async def assign_customer_code(db: AsyncSession, user: User) -> str:
+    """Lazily assign a unique 3-char alphanumeric code to a user on their first order."""
+    if user.customer_code:
+        return user.customer_code
+    while True:
+        code = "".join(random.choices(string.ascii_uppercase + string.digits, k=3))
+        existing = await db.execute(select(User).where(User.customer_code == code))
+        if not existing.scalar_one_or_none():
+            user.customer_code = code
+            await db.flush()
+            return code
+
+
+async def generate_order_number(db: AsyncSession, customer_code: str) -> str:
+    """Atomically increment the per-customer serial counter and return formatted order number."""
+    result = await db.execute(
+        select(OrderSerialCounter)
+        .where(OrderSerialCounter.customer_code == customer_code)
+        .with_for_update()
+    )
+    counter = result.scalar_one_or_none()
+    if counter is None:
+        counter = OrderSerialCounter(customer_code=customer_code, last_serial=0)
+        db.add(counter)
+    counter.last_serial += 1
+    await db.flush()
+    return f"{customer_code}-{counter.last_serial:06d}"
+
+
+# ── Audit Log ──────────────────────────────────────────────────────────────────
+
+async def write_audit_log(
+    db: AsyncSession,
+    order_id: str,
+    user: User | None,
+    old_status: str | None,
+    new_status: str,
+    note: str | None = None,
+) -> None:
+    """Append an immutable audit log entry for a status transition."""
+    entry = OrderAuditLog(
+        id=str(uuid.uuid4()),
+        order_id=order_id,
+        changed_by=user.id if user else None,
+        changed_by_role=getattr(user, "role", None) if user else None,
+        old_status=old_status,
+        new_status=new_status,
+        note=note,
+    )
+    db.add(entry)
+    await db.flush()
+
+
+# ── Create Order ───────────────────────────────────────────────────────────────
 
 async def create_order(db: AsyncSession, user_id: str, data: OrderCreate) -> Order:
+    # Resolve user to assign customer code + generate order number
+    user_result = await db.execute(select(User).where(User.id == user_id).with_for_update())
+    user = user_result.scalar_one()
+
+    customer_code = await assign_customer_code(db, user)
+    order_number = await generate_order_number(db, customer_code)
+
     # Server-side price calculation for each item
     items: list[OrderItem] = []
     subtotal = Decimal("0")
@@ -54,9 +117,9 @@ async def create_order(db: AsyncSession, user_id: str, data: OrderCreate) -> Ord
     totals = calc_order_total(subtotal, data.shipping_method, config=config)
 
     order = Order(
-        order_number=generate_order_number(),
+        order_number=order_number,
         user_id=user_id,
-        status="confirmed",
+        status="CONFIRM",
         shipping_address=data.shipping.model_dump(),
         shipping_method=data.shipping_method,
         shipping_cost=totals["shipping_cost"],
@@ -71,6 +134,9 @@ async def create_order(db: AsyncSession, user_id: str, data: OrderCreate) -> Ord
 
     db.add(order)
     await db.flush()
+
+    # Write initial audit log entry
+    await write_audit_log(db, order.id, user, old_status=None, new_status="CONFIRM", note="Order placed")
 
     # Send confirmation email — never blocks order creation if email fails
     recipient_email = data.shipping.email

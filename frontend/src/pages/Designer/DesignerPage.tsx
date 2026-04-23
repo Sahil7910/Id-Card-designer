@@ -1,5 +1,6 @@
 import DOMPurify from "dompurify";
-import { useRef, useCallback, useEffect } from "react";
+import html2canvas from "html2canvas";
+import { useRef, useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAppDispatch, useAppSelector } from "../../app/hooks";
 import { designerActions } from "../../features/designer/designerSlice";
@@ -8,6 +9,7 @@ import type { CardField, CardTemplate, RHandle, DesignSide, DragState, ChipType 
 import { TEXT_TYPES } from "../../shared/types";
 import type { CartItem } from "../../shared/types";
 import { calcUnitPrice, calcTotal, uid, loadDesignerFonts, api } from "../../shared/utils";
+import { uploadFile } from "../../shared/utils/api";
 import { API_BASE } from "../../shared/utils/apiBase";
 import {
   fetchPublicOptions,
@@ -24,7 +26,9 @@ import { FIELD_TEMPLATES, FIELD_COLORS } from "../../features/designer/constants
 import { CardCanvas } from "../../features/designer/components/CardCanvas";
 import { PreviewField } from "../../features/designer/components/PreviewField";
 import { FontPicker } from "../../features/designer/components/FontPicker";
-import { PhotoDriveOption, PhotoUrlOption } from "../../features/designer/components/PhotoUpload";
+import { ColorPicker } from "../../features/designer/components/ColorPicker";
+import { useFabricCanvas } from "../../features/designer/hooks/useFabricCanvas";
+import { checkExportColors } from "../../features/designer/services/exportService";
 import TemplatePage from "./Templategallery";
 import Checkout from "../Checkout";
 
@@ -50,7 +54,19 @@ export default function IDCardDesigner() {
     printer, printSide, cardType, orientation, chipType, finish, material, quantity,
     activeTab, designingSide, selectedFieldId, showFieldPicker,
     frontFields, backFields, frontBg, backBg, frontBgUrl, backBgUrl, showPreview, savedToast,
+    designs, activeDesignId,
   } = d;
+
+  const { canUndo, canRedo, undo, redo } = useFabricCanvas();
+  const [canvasZoom, setCanvasZoom] = useState(1);
+  const [exportWarnings, setExportWarnings] = useState<{ fieldLabel: string; hex: string; warning: string }[]>([]);
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState("");
+  const [showSaveTemplate, setShowSaveTemplate] = useState(false);
+  const [templateName, setTemplateName] = useState("");
+  const [savingTemplate, setSavingTemplate] = useState(false);
+  const [saveTemplateError, setSaveTemplateError] = useState<string | null>(null);
+  const [saveTemplateSuccess, setSaveTemplateSuccess] = useState(false);
 
   const fields = designingSide === "front" ? frontFields : backFields;
 
@@ -90,6 +106,13 @@ export default function IDCardDesigner() {
 
   useEffect(() => {
     const activeRef = designingSide === "front" ? frontCardRef : backCardRef;
+    const SNAP_GUIDES = [25, 50, 75];
+    const SNAP_THRESHOLD = 2;
+    const snapVal = (v: number) => {
+      for (const g of SNAP_GUIDES) { if (Math.abs(v - g) < SNAP_THRESHOLD) return g; }
+      return v;
+    };
+
     const onMove = (e: MouseEvent) => {
       const dr = dragging.current;
       if (!dr || !activeRef.current) return;
@@ -100,8 +123,8 @@ export default function IDCardDesigner() {
         dispatch(designerActions.updateField({
           id: dr.id,
           patch: {
-            x: Math.max(0, Math.min(95, dr.origX + dx)),
-            y: Math.max(0, Math.min(95, dr.origY + dy)),
+            x: snapVal(Math.max(0, Math.min(95, dr.origX + dx))),
+            y: snapVal(Math.max(0, Math.min(95, dr.origY + dy))),
           },
         }));
       } else {
@@ -127,7 +150,28 @@ export default function IDCardDesigner() {
 
   const applyTemplate = (tpl: CardTemplate) => dispatch(designerActions.applyTemplate(tpl));
 
-  const placeOrder = () => {
+  const handleTemplateUpload = async (file: File, side: "front" | "back") => {
+    const fd = new FormData();
+    fd.append("file", file, file.name);
+    try {
+      const { url } = await uploadFile<{ url: string }>("/api/uploads/image", fd);
+      if (side === "front") dispatch(designerActions.setFrontBg({ url }));
+      else dispatch(designerActions.setBackBg({ url }));
+    } catch {
+      // upload failed silently — canvas stays blank
+    }
+  };
+
+  const handleOrderClick = () => {
+    const warnings = checkExportColors([...frontFields, ...backFields]);
+    if (warnings.length > 0) {
+      setExportWarnings(warnings);
+      return;
+    }
+    placeOrder();
+  };
+
+  const placeOrder = async () => {
     // Merge card_options price_addon into pricingConfig so calculation matches what the dropdowns show
     const addonFromOptions = (opts: { value: string; price_addon: number }[], val: string) =>
       opts.find(o => o.value === val)?.price_addon;
@@ -140,8 +184,49 @@ export default function IDCardDesigner() {
     };
     const unitPrice = calcUnitPrice(printer, finish, chipType, printSide, mergedConfig);
     const totalPrice = calcTotal(unitPrice, quantity, mergedConfig);
+
+    // Save design + capture thumbnail (best-effort — never blocks adding to cart)
+    let designId: string | undefined;
+    if (isAuthenticated) {
+      try {
+        // 1. Save design record
+        const saved = await api.post<{ id: string }>("/api/designs/", {
+          name: "Untitled Design",
+          printer, print_side: printSide, card_type: cardType,
+          orientation, chip_type: chipType, finish, material,
+          front_fields: frontFields,
+          back_fields: backFields,
+        });
+        designId = saved.id;
+
+        // 2. Capture front card as PNG using html2canvas (runs in background)
+        if (frontCardRef.current) {
+          const savedId = designId;
+          html2canvas(frontCardRef.current, {
+            backgroundColor: null,
+            scale: 1,
+            useCORS: true,
+            logging: false,
+          }).then(canvas => {
+            return new Promise<Blob | null>(resolve => canvas.toBlob(resolve, "image/png"));
+          }).then(async (blob) => {
+            if (!blob) return;
+            const fd = new FormData();
+            fd.append("file", blob, "thumbnail.png");
+            const { url } = await uploadFile<{ url: string }>("/api/uploads/image", fd);
+            await api.put(`/api/designs/${savedId}`, { thumbnail_url: url });
+          }).catch(() => {
+            // thumbnail capture/upload failed silently
+          });
+        }
+      } catch {
+        // design save failed — cart item still added without design_id
+      }
+    }
+
     const newItem: CartItem = {
       id: uid(),
+      designId,
       cardType, printer, printSide, orientation,
       chipType, finish, material, quantity,
       unitPrice, totalPrice,
@@ -188,6 +273,37 @@ export default function IDCardDesigner() {
     setTimeout(() => dispatch(designerActions.hideSavedToast()), 2500);
   };
 
+  const handleSaveTemplate = async () => {
+    if (!templateName.trim()) {
+      setSaveTemplateError("Please enter a template name");
+      return;
+    }
+    setSavingTemplate(true);
+    setSaveTemplateError(null);
+    try {
+      await api.post("/api/templates/my", {
+        name: templateName.trim(),
+        front_fields: frontFields,
+        back_fields: backFields,
+        front_bg_url: frontBgUrl || null,
+        back_bg_url: backBgUrl || null,
+        orientation,
+        accent_color: null,
+        bg_color: null,
+      });
+      setSaveTemplateSuccess(true);
+      setTimeout(() => {
+        setShowSaveTemplate(false);
+        setSaveTemplateSuccess(false);
+        setTemplateName("");
+      }, 1800);
+    } catch (err: unknown) {
+      setSaveTemplateError(err instanceof Error ? err.message : "Failed to save template");
+    } finally {
+      setSavingTemplate(false);
+    }
+  };
+
   const selectedField = fields.find(f => f.id === selectedFieldId) ?? null;
   const showTemplatePage = activeTab === "TEMPLATE";
 
@@ -210,12 +326,29 @@ export default function IDCardDesigner() {
           <span style={{ fontWeight: 700, fontSize: 18, letterSpacing: 1.5, color: "#f1f5f9" }}>ID CARD DESIGNER</span>
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <button onClick={undo} disabled={!canUndo} title="Undo (Ctrl+Z)"
+            style={{ background: "#1e2330", border: `1px solid ${canUndo ? "#3a3f52" : "#2a2f3e"}`, color: canUndo ? "#94a3b8" : "#3a3f52", borderRadius: 6, padding: "7px 12px", cursor: canUndo ? "pointer" : "not-allowed", fontSize: 14, fontWeight: 600, transition: "all 0.15s" }}>
+            ↩
+          </button>
+          <button onClick={redo} disabled={!canRedo} title="Redo (Ctrl+Y)"
+            style={{ background: "#1e2330", border: `1px solid ${canRedo ? "#3a3f52" : "#2a2f3e"}`, color: canRedo ? "#94a3b8" : "#3a3f52", borderRadius: 6, padding: "7px 12px", cursor: canRedo ? "pointer" : "not-allowed", fontSize: 14, fontWeight: 600, transition: "all 0.15s" }}>
+            ↪
+          </button>
           <button onClick={saveDesign}
             style={{ background: "#1e2330", border: "1px solid #3a3f52", color: "#94a3b8", borderRadius: 6, padding: "7px 14px", cursor: "pointer", fontSize: 12, fontWeight: 600, display: "flex", alignItems: "center", gap: 6, transition: "all 0.15s" }}
             onMouseEnter={e => { e.currentTarget.style.borderColor = "#16a34a55"; e.currentTarget.style.color = "#16a34a"; }}
             onMouseLeave={e => { e.currentTarget.style.borderColor = "#3a3f52"; e.currentTarget.style.color = "#94a3b8"; }}>
             {"\u{1F4BE}"} SAVE & FINISH LATER
           </button>
+          {isAuthenticated && (
+            <button onClick={() => { setShowSaveTemplate(true); setSaveTemplateError(null); setSaveTemplateSuccess(false); setTemplateName(""); }}
+              style={{ background: "#1e2330", border: "1px solid #3a3f52", color: "#94a3b8", borderRadius: 6, padding: "7px 14px", cursor: "pointer", fontSize: 12, fontWeight: 600, display: "flex", alignItems: "center", gap: 6, transition: "all 0.15s" }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = "#a855f755"; e.currentTarget.style.color = "#a855f7"; }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = "#3a3f52"; e.currentTarget.style.color = "#94a3b8"; }}
+              title="Save current design as a personal template">
+              {"\u{1F4CB}"} SAVE AS TEMPLATE
+            </button>
+          )}
           <button onClick={() => dispatch(designerActions.setShowPreview(true))}
             style={{ background: "#1e2330", border: "1px solid #3a3f52", color: "#94a3b8", borderRadius: 6, padding: "7px 14px", cursor: "pointer", fontSize: 12, fontWeight: 600, display: "flex", alignItems: "center", gap: 6, transition: "all 0.15s" }}
             onMouseEnter={e => { e.currentTarget.style.borderColor = "#0ea5e955"; e.currentTarget.style.color = "#0ea5e9"; }}
@@ -272,10 +405,10 @@ export default function IDCardDesigner() {
               <div style={{ background: "#1e2330", border: "1px solid #2a2f3e", borderRadius: 10, padding: 13 }}>
                 <div style={{ fontSize: 10, fontWeight: 700, color: "#64748b", letterSpacing: 1.5, marginBottom: 11 }}>DESIGN TOOLS</div>
                 <div style={{ display: "flex", background: "#13161d", borderRadius: 7, padding: 3, marginBottom: activeTab === "TEMPLATE" ? 0 : 13, gap: 2 }}>
-                  {(["CONTENT", "STYLE", "TEMPLATE"] as const).map(tab => (
+                  {(["CONTENT", "TEMPLATE"] as const).map(tab => (
                     <button key={tab} onClick={() => dispatch(designerActions.setActiveTab(tab))}
                       style={{ flex: 1, background: activeTab === tab ? "#e05c1a" : "transparent", border: "none", color: activeTab === tab ? "#fff" : "#64748b", borderRadius: 5, padding: "6px 3px", cursor: "pointer", fontSize: 10, fontWeight: 600 }}>
-                      {tab === "CONTENT" ? "\u270F " : tab === "STYLE" ? "\u{1F3A8} " : "\u229E "}{tab}
+                      {tab === "CONTENT" ? "\u270F " : "\u229E "}{tab}
                     </button>
                   ))}
                 </div>
@@ -323,14 +456,23 @@ export default function IDCardDesigner() {
                       </button>
                       {showFieldPicker && (
                         <div style={{ position: "absolute", top: "calc(100% + 6px)", left: 0, right: 0, background: "#1a1e28", border: "1px solid #3a3f52", borderRadius: 9, zIndex: 200, overflow: "hidden", boxShadow: "0 8px 32px rgba(0,0,0,0.55)" }}>
-                          <div style={{ padding: "8px 12px 4px", fontSize: 9, fontWeight: 700, color: "#475569", letterSpacing: 1.5 }}>CHOOSE FIELD TYPE</div>
-                          {FIELD_TEMPLATES.map(t => (
-                            <button key={t.type} onClick={() => dispatch(designerActions.addField(t.type))}
-                              style={{ width: "100%", display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", background: "transparent", border: "none", borderBottom: "1px solid #2a2f3e22", color: "#e2e8f0", cursor: "pointer", fontSize: 12, textAlign: "left" }}
-                              onMouseEnter={e => (e.currentTarget.style.background = "#e05c1a18")}
+                          <div style={{ padding: "8px 12px 5px", fontSize: 9, fontWeight: 700, color: "#475569", letterSpacing: 1.5 }}>ADD FIELD</div>
+                          {([
+                            { type: "photo",   icon: "👤", label: "Photo",      desc: "Upload a person photo",     color: "#6366f1" },
+                            { type: "text",    icon: "T",  label: "Text Label", desc: "Any text — name, title…",   color: "#e05c1a" },
+                            { type: "barcode", icon: "▦",  label: "Barcode",    desc: "CODE128 scannable barcode", color: "#64748b" },
+                            { type: "qr",      icon: "⬛", label: "QR Code",   desc: "URL or text as QR code",    color: "#0f172a" },
+                          ] as const).map((t, i, arr) => (
+                            <button key={t.type}
+                              onClick={() => dispatch(designerActions.addField(t.type))}
+                              style={{ width: "100%", display: "flex", alignItems: "center", gap: 12, padding: "10px 14px", background: "transparent", border: "none", borderBottom: i < arr.length - 1 ? "1px solid #2a2f3e33" : "none", color: "#e2e8f0", cursor: "pointer", textAlign: "left" }}
+                              onMouseEnter={e => (e.currentTarget.style.background = "#e05c1a12")}
                               onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
-                              <span style={{ width: 28, height: 28, borderRadius: 6, background: FIELD_COLORS[t.type] + "28", border: `1px solid ${FIELD_COLORS[t.type]}55`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, flexShrink: 0 }}>{t.icon}</span>
-                              <span>{t.label}</span>
+                              <span style={{ width: 34, height: 34, borderRadius: 8, background: t.color + "22", border: `1px solid ${t.color}55`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15, flexShrink: 0, fontWeight: 700, color: t.color }}>{t.icon}</span>
+                              <div>
+                                <div style={{ fontSize: 12, fontWeight: 700, color: "#e2e8f0", marginBottom: 1 }}>{t.label}</div>
+                                <div style={{ fontSize: 10, color: "#475569" }}>{t.desc}</div>
+                              </div>
                             </button>
                           ))}
                         </div>
@@ -338,16 +480,22 @@ export default function IDCardDesigner() {
                     </div>
 
                     <div style={{ display: "flex", gap: 5, marginTop: 8 }}>
-                      {[
-                        { label: "\u{1F4BE} Save", color: "#16a34a", bg: "#14532d22", action: saveDesign },
-                        { label: "\u2715 Clear", color: "#dc2626", bg: "#7f1d1d22", action: () => dispatch(designerActions.clearFields()) },
-                        { label: "\u21BA Reset", color: "#f59e0b", bg: "#78350f22", action: () => {} },
-                      ].map(btn => (
-                        <button key={btn.label} onClick={btn.action}
-                          style={{ flex: 1, background: btn.bg, border: `1px solid ${btn.color}44`, color: btn.color, borderRadius: 6, padding: "6px 4px", cursor: "pointer", fontSize: 10, fontWeight: 600 }}>
-                          {btn.label}
-                        </button>
-                      ))}
+                      <button onClick={saveDesign}
+                        style={{ flex: 1, background: "#14532d22", border: "1px solid #16a34a44", color: "#16a34a", borderRadius: 6, padding: "6px 4px", cursor: "pointer", fontSize: 10, fontWeight: 600 }}>
+                        {"\u{1F4BE}"} Save
+                      </button>
+                      <button onClick={() => dispatch(designerActions.clearFields())}
+                        style={{ flex: 1, background: "#7f1d1d22", border: "1px solid #dc262644", color: "#dc2626", borderRadius: 6, padding: "6px 4px", cursor: "pointer", fontSize: 10, fontWeight: 600 }}>
+                        {"\u2715"} Clear
+                      </button>
+                      <button onClick={undo} disabled={!canUndo}
+                        style={{ flex: 1, background: canUndo ? "#1e2a4022" : "transparent", border: `1px solid ${canUndo ? "#0ea5e944" : "#2a2f3e"}`, color: canUndo ? "#0ea5e9" : "#3a3f52", borderRadius: 6, padding: "6px 4px", cursor: canUndo ? "pointer" : "not-allowed", fontSize: 12, fontWeight: 600 }}>
+                        ↩ Undo
+                      </button>
+                      <button onClick={redo} disabled={!canRedo}
+                        style={{ flex: 1, background: canRedo ? "#1e2a4022" : "transparent", border: `1px solid ${canRedo ? "#0ea5e944" : "#2a2f3e"}`, color: canRedo ? "#0ea5e9" : "#3a3f52", borderRadius: 6, padding: "6px 4px", cursor: canRedo ? "pointer" : "not-allowed", fontSize: 12, fontWeight: 600 }}>
+                        ↪ Redo
+                      </button>
                     </div>
                   </>
                 )}
@@ -411,17 +559,7 @@ export default function IDCardDesigner() {
                         </div>
                       </FieldRow>
                       <FieldRow label="Text Color">
-                        <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
-                          {["#1e293b", "#ffffff", "#e05c1a", "#0ea5e9", "#10b981", "#f59e0b", "#ec4899", "#6366f1", "#334155", "#7c3aed"].map(c => (
-                            <div key={c} onClick={() => updateField(selectedField.id, { color: c })}
-                              style={{ width: 22, height: 22, borderRadius: 5, background: c, border: selectedField.color === c ? "2px solid #e05c1a" : "2px solid #2a2f3e", cursor: "pointer", boxShadow: selectedField.color === c ? "0 0 0 2px #e05c1a44" : "none", transition: "box-shadow 0.15s" }} />
-                          ))}
-                          <label style={{ width: 22, height: 22, borderRadius: 5, border: "1px dashed #3a3f52", cursor: "pointer", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, color: "#64748b", position: "relative" }}>
-                            <span>+</span>
-                            <input type="color" value={selectedField.color ?? "#1e293b"} onChange={e => updateField(selectedField.id, { color: e.target.value })}
-                              style={{ position: "absolute", opacity: 0, width: "100%", height: "100%", cursor: "pointer" }} />
-                          </label>
-                        </div>
+                        <ColorPicker value={selectedField.color ?? "#1e293b"} onChange={c => updateField(selectedField.id, { color: c })} />
                       </FieldRow>
                       <FieldRow label="Alignment">
                         <div style={{ display: "flex", gap: 5 }}>
@@ -441,13 +579,45 @@ export default function IDCardDesigner() {
                     </>
                   )}
 
+                  {/* Barcode properties */}
+                  {selectedField.type === "barcode" && (
+                    <>
+                      <div style={{ height: 1, background: "#2a2f3e", margin: "6px 0 12px" }} />
+                      <div style={{ fontSize: 10, fontWeight: 700, color: "#64748b", letterSpacing: 1.5, marginBottom: 10 }}>BARCODE DATA</div>
+                      <FieldRow label="Barcode Value">
+                        <input value={selectedField.barcodeValue ?? "1234567890"}
+                          onChange={e => updateField(selectedField.id, { barcodeValue: e.target.value })}
+                          style={{ width: "100%", background: "#13161d", border: "1px solid #2a2f3e", color: "#e2e8f0", borderRadius: 6, padding: "7px 10px", fontSize: 12, outline: "none", boxSizing: "border-box", fontFamily: "monospace" }} />
+                      </FieldRow>
+                      <FieldRow label="Bar Color">
+                        <ColorPicker value={selectedField.color ?? "#000000"} onChange={c => updateField(selectedField.id, { color: c })} />
+                      </FieldRow>
+                    </>
+                  )}
+
+                  {/* QR properties */}
+                  {selectedField.type === "qr" && (
+                    <>
+                      <div style={{ height: 1, background: "#2a2f3e", margin: "6px 0 12px" }} />
+                      <div style={{ fontSize: 10, fontWeight: 700, color: "#64748b", letterSpacing: 1.5, marginBottom: 10 }}>QR CODE DATA</div>
+                      <FieldRow label="QR Content (URL or text)">
+                        <input value={selectedField.qrValue ?? "https://example.com"}
+                          onChange={e => updateField(selectedField.id, { qrValue: e.target.value })}
+                          style={{ width: "100%", background: "#13161d", border: "1px solid #2a2f3e", color: "#e2e8f0", borderRadius: 6, padding: "7px 10px", fontSize: 12, outline: "none", boxSizing: "border-box" }} />
+                      </FieldRow>
+                      <FieldRow label="QR Color">
+                        <ColorPicker value={selectedField.color ?? "#000000"} onChange={c => updateField(selectedField.id, { color: c })} />
+                      </FieldRow>
+                    </>
+                  )}
+
                   {selectedField.type === "photo" && (
                     <>
                       <div style={{ height: 1, background: "#2a2f3e", margin: "6px 0 12px" }} />
-                      <div style={{ fontSize: 10, fontWeight: 700, color: "#6366f1", letterSpacing: 1.5, marginBottom: 10 }}>PHOTO UPLOAD</div>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: "#6366f1", letterSpacing: 1.5, marginBottom: 10 }}>PHOTO</div>
 
                       {selectedField.imageUrl ? (
-                        <div style={{ position: "relative", marginBottom: 10 }}>
+                        <div style={{ position: "relative", marginBottom: 12 }}>
                           <img src={selectedField.imageUrl} alt="Uploaded"
                             style={{ width: "100%", height: 100, objectFit: "cover", borderRadius: 8, border: "1px solid #2a2f3e", display: "block" }} />
                           <button onClick={() => updateField(selectedField.id, { imageUrl: undefined })}
@@ -455,59 +625,14 @@ export default function IDCardDesigner() {
                           <div style={{ position: "absolute", bottom: 6, left: 6, background: "#16a34a", borderRadius: 4, padding: "2px 7px", fontSize: 9, fontWeight: 700, color: "#fff" }}>{"\u2713"} Photo uploaded</div>
                         </div>
                       ) : (
-                        <div style={{ background: "#13161d", border: "2px dashed #6366f133", borderRadius: 8, padding: "14px 10px", marginBottom: 10, textAlign: "center" }}>
+                        <div style={{ background: "#13161d", border: "2px dashed #6366f133", borderRadius: 8, padding: "14px 10px", marginBottom: 12, textAlign: "center" }}>
                           <div style={{ fontSize: 20, opacity: 0.3, marginBottom: 6 }}>{"\u{1F464}"}</div>
-                          <div style={{ fontSize: 11, color: "#475569" }}>No photo uploaded yet</div>
+                          <div style={{ fontSize: 11, color: "#6366f1", fontWeight: 600, marginBottom: 3 }}>Click the photo frame</div>
+                          <div style={{ fontSize: 10, color: "#475569" }}>Tap it on the canvas to open file picker</div>
                         </div>
                       )}
 
-                      <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
-                        <label style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 8, border: "1px solid #2a2f3e", background: "#13161d", cursor: "pointer", transition: "all 0.15s" }}
-                          onMouseEnter={e => { e.currentTarget.style.borderColor = "#6366f155"; e.currentTarget.style.background = "#6366f108"; }}
-                          onMouseLeave={e => { e.currentTarget.style.borderColor = "#2a2f3e"; e.currentTarget.style.background = "#13161d"; }}>
-                          <span style={{ width: 32, height: 32, borderRadius: 8, background: "#6366f118", border: "1px solid #6366f133", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15, flexShrink: 0 }}>{"\u{1F4BB}"}</span>
-                          <div style={{ flex: 1 }}>
-                            <div style={{ fontSize: 12, fontWeight: 700, color: "#e2e8f0" }}>Upload from Device</div>
-                            <div style={{ fontSize: 10, color: "#475569", marginTop: 1 }}>JPG, PNG, WEBP up to 5MB</div>
-                          </div>
-                          <span style={{ fontSize: 11, color: "#6366f1", fontWeight: 600 }}>Browse {"\u2192"}</span>
-                          <input type="file" accept="image/*" style={{ display: "none" }}
-                            onChange={e => {
-                              const file = e.target.files?.[0];
-                              if (!file) return;
-                              const reader = new FileReader();
-                              reader.onload = ev => updateField(selectedField.id, { imageUrl: ev.target?.result as string });
-                              reader.readAsDataURL(file);
-                              e.target.value = "";
-                            }} />
-                        </label>
-
-                        <label style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 8, border: "1px solid #2a2f3e", background: "#13161d", cursor: "pointer", transition: "all 0.15s" }}
-                          onMouseEnter={e => { e.currentTarget.style.borderColor = "#10b98155"; e.currentTarget.style.background = "#10b98108"; }}
-                          onMouseLeave={e => { e.currentTarget.style.borderColor = "#2a2f3e"; e.currentTarget.style.background = "#13161d"; }}>
-                          <span style={{ width: 32, height: 32, borderRadius: 8, background: "#10b98118", border: "1px solid #10b98133", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15, flexShrink: 0 }}>{"\u{1F4F7}"}</span>
-                          <div style={{ flex: 1 }}>
-                            <div style={{ fontSize: 12, fontWeight: 700, color: "#e2e8f0" }}>Take a Photo</div>
-                            <div style={{ fontSize: 10, color: "#475569", marginTop: 1 }}>Use your device camera</div>
-                          </div>
-                          <span style={{ fontSize: 11, color: "#10b981", fontWeight: 600 }}>Open {"\u2192"}</span>
-                          <input type="file" accept="image/*" capture="user" style={{ display: "none" }}
-                            onChange={e => {
-                              const file = e.target.files?.[0];
-                              if (!file) return;
-                              const reader = new FileReader();
-                              reader.onload = ev => updateField(selectedField.id, { imageUrl: ev.target?.result as string });
-                              reader.readAsDataURL(file);
-                              e.target.value = "";
-                            }} />
-                        </label>
-
-                        <PhotoDriveOption icon={"\u{1F7E2}"} label="Google Drive" subtitle="Import from your Drive" color="#10b981" onUrl={url => updateField(selectedField.id, { imageUrl: url })} />
-                        <PhotoDriveOption icon={"\u{1F4E6}"} label="Dropbox" subtitle="Import from Dropbox" color="#0061ff" onUrl={url => updateField(selectedField.id, { imageUrl: url })} />
-                        <PhotoUrlOption onUrl={url => updateField(selectedField.id, { imageUrl: url })} />
-                      </div>
-
-                      <div style={{ height: 1, background: "#2a2f3e", margin: "12px 0" }} />
+                      <div style={{ height: 1, background: "#2a2f3e", margin: "0 0 12px" }} />
                       <div style={{ fontSize: 10, fontWeight: 700, color: "#6366f1", letterSpacing: 1.5, marginBottom: 10 }}>PHOTO BORDER</div>
                       <FieldRow label="Border Style">
                         <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
@@ -574,8 +699,39 @@ export default function IDCardDesigner() {
                           <span style={{ fontSize: 7, color: "#64748b", fontWeight: 700 }}>PREVIEW</span>
                         </div>
                       </div>
+
+                      {/* Photo zoom/fit/pan */}
+                      <div style={{ height: 1, background: "#2a2f3e", margin: "12px 0" }} />
+                      <div style={{ fontSize: 10, fontWeight: 700, color: "#6366f1", letterSpacing: 1.5, marginBottom: 10 }}>IMAGE FIT &amp; ZOOM</div>
+                      <FieldRow label="Image Fit">
+                        <div style={{ display: "flex", gap: 5 }}>
+                          {(["cover", "contain", "fill"] as const).map(fit => {
+                            const active = (selectedField.imageFit ?? "cover") === fit;
+                            return <button key={fit} onClick={() => updateField(selectedField.id, { imageFit: fit })}
+                              style={{ flex: 1, padding: "5px 0", borderRadius: 5, border: `1px solid ${active ? "#6366f1" : "#2a2f3e"}`, background: active ? "#6366f122" : "#13161d", color: active ? "#6366f1" : "#64748b", cursor: "pointer", fontSize: 10, fontWeight: 600, textTransform: "capitalize" }}>
+                              {fit}
+                            </button>;
+                          })}
+                        </div>
+                      </FieldRow>
+                      <FieldRow label={`Zoom: ${(selectedField.imageScale ?? 1).toFixed(1)}×`}>
+                        <input type="range" min={50} max={300} step={5} value={Math.round((selectedField.imageScale ?? 1) * 100)}
+                          onChange={e => updateField(selectedField.id, { imageScale: parseInt(e.target.value) / 100 })}
+                          style={{ width: "100%", accentColor: "#6366f1" }} />
+                      </FieldRow>
+                      <FieldRow label={`Pan X: ${selectedField.imageOffsetX ?? 0}%`}>
+                        <input type="range" min={-50} max={50} value={selectedField.imageOffsetX ?? 0}
+                          onChange={e => updateField(selectedField.id, { imageOffsetX: parseInt(e.target.value) })}
+                          style={{ width: "100%", accentColor: "#6366f1" }} />
+                      </FieldRow>
+                      <FieldRow label={`Pan Y: ${selectedField.imageOffsetY ?? 0}%`}>
+                        <input type="range" min={-50} max={50} value={selectedField.imageOffsetY ?? 0}
+                          onChange={e => updateField(selectedField.id, { imageOffsetY: parseInt(e.target.value) })}
+                          style={{ width: "100%", accentColor: "#6366f1" }} />
+                      </FieldRow>
                     </>
                   )}
+
                 </div>
               )}
 
@@ -716,16 +872,57 @@ export default function IDCardDesigner() {
             onClose={() => dispatch(designerActions.setActiveTab("CONTENT"))}
           />
         ) : (
-          <div style={{ flex: 1, display: "flex", flexDirection: "column", padding: "24px 32px", gap: 20, overflowY: "auto" }}
+          <div style={{ flex: 1, display: "flex", flexDirection: "column", overflowY: "auto" }}
             onClick={() => { dispatch(designerActions.hideFieldPicker()); dispatch(designerActions.selectField(null)); }}>
 
+            {/* Multi-design tabs */}
+            <div style={{ background: "#1a1e28", borderBottom: "1px solid #2a2f3e", padding: "0 24px", display: "flex", alignItems: "center", gap: 4, overflowX: "auto", flexShrink: 0 }}>
+              {designs.map(d => (
+                <div key={d.id} style={{ display: "flex", alignItems: "center", gap: 0, flexShrink: 0 }}>
+                  {renamingId === d.id ? (
+                    <input autoFocus value={renameValue}
+                      onChange={e => setRenameValue(e.target.value)}
+                      onBlur={() => { dispatch(designerActions.renameDesign({ id: d.id, name: renameValue || d.name })); setRenamingId(null); }}
+                      onKeyDown={e => { if (e.key === "Enter") { dispatch(designerActions.renameDesign({ id: d.id, name: renameValue || d.name })); setRenamingId(null); } if (e.key === "Escape") setRenamingId(null); }}
+                      style={{ background: "#13161d", border: "1px solid #e05c1a", color: "#e2e8f0", borderRadius: 4, padding: "4px 8px", fontSize: 11, outline: "none", width: 100 }} />
+                  ) : (
+                    <button onClick={e => { e.stopPropagation(); dispatch(designerActions.switchDesign(d.id)); }}
+                      onDoubleClick={e => { e.stopPropagation(); setRenamingId(d.id); setRenameValue(d.name); }}
+                      style={{ padding: "8px 12px", background: "transparent", border: "none", borderBottom: `2px solid ${d.id === activeDesignId ? "#e05c1a" : "transparent"}`, color: d.id === activeDesignId ? "#e05c1a" : "#64748b", cursor: "pointer", fontSize: 11, fontWeight: d.id === activeDesignId ? 700 : 400, transition: "all 0.15s", whiteSpace: "nowrap" }}>
+                      {d.name}
+                    </button>
+                  )}
+                  {designs.length > 1 && (
+                    <button onClick={e => { e.stopPropagation(); dispatch(designerActions.removeDesign(d.id)); }}
+                      style={{ background: "none", border: "none", color: "#475569", cursor: "pointer", fontSize: 11, padding: "0 2px 0 0", lineHeight: 1 }}
+                      title="Remove design">×</button>
+                  )}
+                </div>
+              ))}
+              <button onClick={e => { e.stopPropagation(); dispatch(designerActions.newDesign()); }}
+                style={{ padding: "8px 10px", background: "transparent", border: "none", color: "#475569", cursor: "pointer", fontSize: 16, fontWeight: 700, lineHeight: 1, flexShrink: 0 }}
+                title="New design">+</button>
+            </div>
+
+            <div style={{ flex: 1, display: "flex", flexDirection: "column", padding: "24px 32px", gap: 20 }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: "#64748b", letterSpacing: 1.5 }}>LIVE PREVIEW</div>
-              <div style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "#1e2330", border: "1px solid #2a2f3e", borderRadius: 20, padding: "4px 12px", fontSize: 11, color: "#64748b" }}>
-                <span>{isHorizontal ? "\u2194" : "\u2195"}</span>
-                <span style={{ fontWeight: 600, color: "#94a3b8" }}>{orientation}</span>
-                <span>{"\u00B7"}</span>
-                <span>{printSide}</span>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                {/* Zoom controls */}
+                <div style={{ display: "flex", gap: 2, background: "#1e2330", border: "1px solid #2a2f3e", borderRadius: 6, padding: 2 }}>
+                  {[0.5, 0.75, 1].map(z => (
+                    <button key={z} onClick={e => { e.stopPropagation(); setCanvasZoom(z); }}
+                      style={{ padding: "3px 7px", borderRadius: 4, border: "none", background: canvasZoom === z ? "#e05c1a" : "transparent", color: canvasZoom === z ? "#fff" : "#64748b", cursor: "pointer", fontSize: 10, fontWeight: 600 }}>
+                      {Math.round(z * 100)}%
+                    </button>
+                  ))}
+                </div>
+                <div style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "#1e2330", border: "1px solid #2a2f3e", borderRadius: 20, padding: "4px 12px", fontSize: 11, color: "#64748b" }}>
+                  <span>{isHorizontal ? "\u2194" : "\u2195"}</span>
+                  <span style={{ fontWeight: 600, color: "#94a3b8" }}>{orientation}</span>
+                  <span>{"\u00B7"}</span>
+                  <span>{printSide}</span>
+                </div>
               </div>
             </div>
 
@@ -743,7 +940,7 @@ export default function IDCardDesigner() {
               </div>
             ) : (
               <>
-                <div style={{ display: "flex", justifyContent: "center", alignItems: "flex-start", gap: 48, flexWrap: "wrap", paddingTop: 8 }}>
+                <div style={{ display: "flex", justifyContent: "center", alignItems: "flex-start", gap: 48, flexWrap: "wrap", paddingTop: 8, transform: `scale(${canvasZoom})`, transformOrigin: "top center", transition: "transform 0.2s" }}>
                   <CardCanvas label="FRONT" side="front"
                     isActive={designingSide === "front" || printSide === "Single Side"}
                     isEditing={designingSide === "front"}
@@ -754,7 +951,9 @@ export default function IDCardDesigner() {
                     onCardClick={() => { if (printSide === "Both Sides") { dispatch(designerActions.setDesigningSide("front")); } }}
                     printSide={printSide}
                     onPhotoUpload={(fieldId, dataUrl) => updateField(fieldId, { imageUrl: dataUrl })}
-                    bgSvg={frontBg} bgUrl={frontBgUrl} />
+                    bgSvg={frontBg} bgUrl={frontBgUrl}
+                    onTemplateUpload={file => handleTemplateUpload(file, "front")}
+                    onRemoveBackground={() => dispatch(designerActions.setFrontBg({ url: "" }))} />
                   {printSide === "Both Sides" && (
                     <CardCanvas label="BACK" side="back"
                       isActive={designingSide === "back"}
@@ -766,7 +965,9 @@ export default function IDCardDesigner() {
                       onCardClick={() => dispatch(designerActions.setDesigningSide("back"))}
                       printSide={printSide}
                       onPhotoUpload={(fieldId, dataUrl) => updateField(fieldId, { imageUrl: dataUrl })}
-                      bgSvg={backBg} bgUrl={backBgUrl} />
+                      bgSvg={backBg} bgUrl={backBgUrl}
+                      onTemplateUpload={file => handleTemplateUpload(file, "back")}
+                      onRemoveBackground={() => dispatch(designerActions.setBackBg({ url: "" }))} />
                   )}
                 </div>
                 {(frontFields.length > 0 || backFields.length > 0) && (
@@ -787,6 +988,7 @@ export default function IDCardDesigner() {
                 </div>
               </>
             )}
+            </div>
           </div>
         )}
       </div>
@@ -811,7 +1013,7 @@ export default function IDCardDesigner() {
                   <div style={{ fontSize: 11, color: "#64748b", marginTop: 2 }}>Actual print output {"\u2014"} {orientation} {"\u00B7"} {printSide}</div>
                 </div>
                 <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-                  <button onClick={placeOrder}
+                  <button onClick={handleOrderClick}
                     style={{ padding: "8px 18px", borderRadius: 8, border: "none", background: "#e05c1a", color: "#fff", fontWeight: 700, fontSize: 12, cursor: "pointer", display: "flex", alignItems: "center", gap: 6, transition: "all 0.15s" }}
                     onMouseEnter={e => { e.currentTarget.style.background = "#c9501a"; }}
                     onMouseLeave={e => { e.currentTarget.style.background = "#e05c1a"; }}>
@@ -821,6 +1023,27 @@ export default function IDCardDesigner() {
                     style={{ background: "#2a2f3e", border: "none", color: "#94a3b8", borderRadius: 8, width: 34, height: 34, cursor: "pointer", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center" }}>{"\u2715"}</button>
                 </div>
               </div>
+              {exportWarnings.length > 0 && (
+                <div style={{ margin: "12px 24px 0", background: "#78350f22", border: "1px solid #f59e0b55", borderRadius: 10, padding: "12px 16px" }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: "#f59e0b", marginBottom: 8 }}>⚠️ Print Color Warnings</div>
+                  {exportWarnings.map((w, i) => (
+                    <div key={i} style={{ fontSize: 11, color: "#f59e0b", display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                      <div style={{ width: 14, height: 14, borderRadius: 3, background: w.hex, flexShrink: 0, border: "1px solid #ffffff33" }} />
+                      <span><strong>{w.fieldLabel}</strong> — {w.warning}</span>
+                    </div>
+                  ))}
+                  <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+                    <button onClick={() => { setExportWarnings([]); placeOrder(); }}
+                      style={{ padding: "6px 14px", borderRadius: 6, border: "none", background: "#e05c1a", color: "#fff", fontWeight: 700, fontSize: 11, cursor: "pointer" }}>
+                      Continue Anyway
+                    </button>
+                    <button onClick={() => setExportWarnings([])}
+                      style={{ padding: "6px 14px", borderRadius: 6, border: "1px solid #f59e0b55", background: "transparent", color: "#f59e0b", fontWeight: 700, fontSize: 11, cursor: "pointer" }}>
+                      Fix Colors
+                    </button>
+                  </div>
+                </div>
+              )}
               <div style={{ padding: "40px 24px", display: "flex", gap: 48, justifyContent: "center", alignItems: "flex-start", flexWrap: "wrap" }}>
                 <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
                   <div style={{ fontSize: 11, fontWeight: 700, color: "#64748b", letterSpacing: 1.5 }}>FRONT SIDE</div>
@@ -957,6 +1180,67 @@ export default function IDCardDesigner() {
           </div>
         )}
       </div>
+
+      {/* ── Save as Template Modal ── */}
+      {showSaveTemplate && (
+        <>
+          <div onClick={() => setShowSaveTemplate(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)", zIndex: 1300, backdropFilter: "blur(4px)" }} />
+          <div style={{ position: "fixed", inset: 0, zIndex: 1301, display: "flex", alignItems: "center", justifyContent: "center", padding: 24, pointerEvents: "none" }}>
+            <div style={{ background: "#1a1e28", borderRadius: 16, border: "1px solid #2a2f3e", boxShadow: "0 32px 80px rgba(0,0,0,0.6)", width: "100%", maxWidth: 440, pointerEvents: "all" }}>
+              <div style={{ padding: "18px 22px 14px", borderBottom: "1px solid #2a2f3e", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <div>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: "#f1f5f9" }}>📋 Save as Template</div>
+                  <div style={{ fontSize: 11, color: "#64748b", marginTop: 3 }}>This template will be visible only to you</div>
+                </div>
+                <button onClick={() => setShowSaveTemplate(false)} style={{ background: "none", border: "none", color: "#475569", cursor: "pointer", fontSize: 18 }}>✕</button>
+              </div>
+              <div style={{ padding: "20px 22px" }}>
+                {saveTemplateSuccess ? (
+                  <div style={{ textAlign: "center", padding: "20px 0" }}>
+                    <div style={{ fontSize: 40, marginBottom: 10 }}>✅</div>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: "#22c55e" }}>Template saved!</div>
+                    <div style={{ fontSize: 12, color: "#64748b", marginTop: 6 }}>Find it in your "My Templates" tab on the Templates page</div>
+                  </div>
+                ) : (
+                  <>
+                    <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#94a3b8", marginBottom: 8 }}>
+                      Template Name
+                    </label>
+                    <input
+                      type="text"
+                      value={templateName}
+                      onChange={e => setTemplateName(e.target.value)}
+                      onKeyDown={e => { if (e.key === "Enter") { void handleSaveTemplate(); } }}
+                      placeholder="e.g. My Corporate Card"
+                      autoFocus
+                      style={{ width: "100%", background: "#13161d", border: `1px solid ${saveTemplateError ? "#ef4444" : "#2a2f3e"}`, borderRadius: 8, padding: "10px 14px", color: "#f1f5f9", fontSize: 14, outline: "none", boxSizing: "border-box" }}
+                    />
+                    {saveTemplateError && (
+                      <div style={{ fontSize: 11, color: "#ef4444", marginTop: 6 }}>{saveTemplateError}</div>
+                    )}
+                    <div style={{ fontSize: 11, color: "#475569", marginTop: 10 }}>
+                      Saves {frontFields.length} front field{frontFields.length !== 1 ? "s" : ""}{backFields.length > 0 ? ` + ${backFields.length} back field${backFields.length !== 1 ? "s" : ""}` : ""} as a reusable template.
+                    </div>
+                    <div style={{ display: "flex", gap: 10, marginTop: 18 }}>
+                      <button
+                        onClick={() => void handleSaveTemplate()}
+                        disabled={savingTemplate || !templateName.trim()}
+                        style={{ flex: 1, background: savingTemplate || !templateName.trim() ? "#334155" : "#a855f7", border: "none", color: "#fff", borderRadius: 8, padding: "10px 0", cursor: savingTemplate || !templateName.trim() ? "not-allowed" : "pointer", fontSize: 13, fontWeight: 700, transition: "background 0.15s" }}>
+                        {savingTemplate ? "Saving…" : "💾 Save Template"}
+                      </button>
+                      <button
+                        onClick={() => setShowSaveTemplate(false)}
+                        style={{ padding: "10px 18px", background: "transparent", border: "1px solid #2a2f3e", color: "#64748b", borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: 600 }}>
+                        Cancel
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }

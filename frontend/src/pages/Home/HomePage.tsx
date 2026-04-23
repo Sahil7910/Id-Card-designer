@@ -1,8 +1,16 @@
 import { useState, useEffect } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, Link, Navigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { useAppDispatch, useAppSelector } from "../../app/hooks";
 import { authActions, selectIsAuthenticated, selectAuthUser } from "../../features/auth/authSlice";
+
+// Canonical redirect destinations for internal staff
+const STAFF_REDIRECTS: Record<string, string> = {
+  DESIGN: "/design-queue",
+  PRINTING: "/print-queue",
+  SHIPPING: "/shipping-queue",
+  ADMIN: "/admin",
+};
 import HeroSection from "./HeroSection";
 
 // ── Google Fonts ───────────────────────────────────────────────────
@@ -116,17 +124,19 @@ function Navbar() {
         <span style={{ fontFamily: "'Bebas Neue', sans-serif", fontSize: 22, color: "#f1f5f9", letterSpacing: 2 }}>CARDCRAFT</span>
       </div>
 
-      {/* Nav links */}
-      <div style={{ display: "flex", alignItems: "center", gap: 32 }}>
-        {["Templates", "Pricing", "Examples"].map(item => (
-          <button key={item} onClick={() => navigate("/templates")}
-            style={{ background: "none", border: "none", color: "#94a3b8", cursor: "pointer", fontSize: 14, fontWeight: 500, fontFamily: "'DM Sans', sans-serif", transition: "color 0.2s" }}
-            onMouseEnter={e => (e.currentTarget.style.color = "#f1f5f9")}
-            onMouseLeave={e => (e.currentTarget.style.color = "#94a3b8")}>
-            {item}
-          </button>
-        ))}
-      </div>
+      {/* Nav links — only for customers/guests */}
+      {(!isAuthenticated || !user || user.role === "CUSTOMER") && (
+        <div style={{ display: "flex", alignItems: "center", gap: 32 }}>
+          {["Templates", "Pricing", "Examples"].map(item => (
+            <button key={item} onClick={() => navigate("/templates")}
+              style={{ background: "none", border: "none", color: "#94a3b8", cursor: "pointer", fontSize: 14, fontWeight: 500, fontFamily: "'DM Sans', sans-serif", transition: "color 0.2s" }}
+              onMouseEnter={e => (e.currentTarget.style.color = "#f1f5f9")}
+              onMouseLeave={e => (e.currentTarget.style.color = "#94a3b8")}>
+              {item}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Auth buttons */}
       <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
@@ -140,6 +150,36 @@ function Navbar() {
                 {user.first_name || user.email.split("@")[0]}
               </span>
             </div>
+
+            {/* CUSTOMER → My Orders; ADMIN → Admin panel; DESIGN/PRINTING/SHIPPING → their queue */}
+            {user.role === "CUSTOMER" && (
+              <Link
+                to="/orders"
+                style={{ padding: "8px 16px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.12)", background: "transparent", color: "#94a3b8", fontSize: 13, fontWeight: 600, fontFamily: "'DM Sans', sans-serif", textDecoration: "none", transition: "all 0.2s" }}
+                onMouseEnter={e => { (e.currentTarget as HTMLAnchorElement).style.color = "#f1f5f9"; (e.currentTarget as HTMLAnchorElement).style.borderColor = "rgba(255,255,255,0.25)"; }}
+                onMouseLeave={e => { (e.currentTarget as HTMLAnchorElement).style.color = "#94a3b8"; (e.currentTarget as HTMLAnchorElement).style.borderColor = "rgba(255,255,255,0.12)"; }}
+              >
+                My Orders
+              </Link>
+            )}
+            {user.role === "DESIGN" && (
+              <Link to="/design-queue"
+                style={{ padding: "8px 16px", borderRadius: 8, border: "1px solid rgba(59,130,246,0.4)", background: "rgba(59,130,246,0.1)", color: "#3b82f6", fontSize: 13, fontWeight: 600, fontFamily: "'DM Sans', sans-serif", textDecoration: "none" }}>
+                Design Queue
+              </Link>
+            )}
+            {user.role === "PRINTING" && (
+              <Link to="/print-queue"
+                style={{ padding: "8px 16px", borderRadius: 8, border: "1px solid rgba(139,92,246,0.4)", background: "rgba(139,92,246,0.1)", color: "#8b5cf6", fontSize: 13, fontWeight: 600, fontFamily: "'DM Sans', sans-serif", textDecoration: "none" }}>
+                Print Queue
+              </Link>
+            )}
+            {user.role === "SHIPPING" && (
+              <Link to="/shipping-queue"
+                style={{ padding: "8px 16px", borderRadius: 8, border: "1px solid rgba(6,182,212,0.4)", background: "rgba(6,182,212,0.1)", color: "#06b6d4", fontSize: 13, fontWeight: 600, fontFamily: "'DM Sans', sans-serif", textDecoration: "none" }}>
+                Shipping Queue
+              </Link>
+            )}
             {user.is_admin && (
               <Link
                 to="/admin"
@@ -157,7 +197,7 @@ function Navbar() {
           </>
         ) : (
           <>
-            <button onClick={() => dispatch(authActions.openAuthModal("login"))}
+            <button onClick={() => navigate("/login")}
               style={{ padding: "8px 20px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.15)", background: "transparent", color: "#e2e8f0", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "'DM Sans', sans-serif", transition: "all 0.2s" }}
               onMouseEnter={e => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.35)"; e.currentTarget.style.background = "rgba(255,255,255,0.06)"; }}
               onMouseLeave={e => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.15)"; e.currentTarget.style.background = "transparent"; }}>
@@ -181,6 +221,13 @@ const HomePage = () => {
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
   const isAuthenticated = useAppSelector(selectIsAuthenticated);
+  const user = useAppSelector(selectAuthUser);
+  const isLoading = useAppSelector((s) => s.auth.isLoading);
+
+  // Internal staff landing on "/" → immediately redirect to their workspace
+  if (!isLoading && user && STAFF_REDIRECTS[user.role]) {
+    return <Navigate to={STAFF_REDIRECTS[user.role]} replace />;
+  }
 
   const requireAuth = (cb: () => void) => () => {
     if (!isAuthenticated) { dispatch(authActions.openAuthModal("login")); return; }

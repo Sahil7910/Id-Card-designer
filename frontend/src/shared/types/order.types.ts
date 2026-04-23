@@ -2,6 +2,7 @@ import type { PrinterType, PrintSide, Orientation, ChipType, Finish, Material } 
 
 export interface CartItem {
   id: string;
+  designId?: string;
   cardType: string;
   printer: PrinterType;
   printSide: PrintSide;

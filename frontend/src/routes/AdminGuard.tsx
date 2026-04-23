@@ -19,7 +19,7 @@ export default function AdminGuard({ children }: AdminGuardProps) {
   }
 
   if (!user || !user.is_admin) {
-    return <Navigate to="/" replace />;
+    return <Navigate to="/login" replace />;
   }
 
   return <>{children}</>;

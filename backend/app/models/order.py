@@ -27,12 +27,18 @@ class Order(Base):
     tax: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
     grand_total: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
     total_cards: Mapped[int] = mapped_column(Integer, nullable=False)
+    # Tracking
+    tracking_number: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    courier_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    tracking_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     # Timestamps
     created_at: Mapped[str] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[str] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
 
     user = relationship("User", back_populates="orders")
     items = relationship("OrderItem", back_populates="order", cascade="all, delete-orphan", lazy="selectin")
+    audit_logs = relationship("OrderAuditLog", back_populates="order", lazy="noload")
+    attachments = relationship("OrderAttachment", back_populates="order", lazy="noload")
 
 
 class OrderItem(Base):

@@ -1,8 +1,8 @@
 import uuid
 
-from sqlalchemy import Boolean, DateTime, String, func
+from sqlalchemy import Boolean, DateTime, ForeignKey, String, func
 from sqlalchemy.dialects.sqlite import JSON
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
 
@@ -22,3 +22,9 @@ class Template(Base):
     orientation: Mapped[str] = mapped_column(String(20), nullable=False, default="Horizontal")
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[str] = mapped_column(DateTime, server_default=func.now())
+
+    # NULL = system/public template; non-null = personal template owned by this user
+    user_id: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True
+    )
+    user: Mapped["User | None"] = relationship(back_populates="templates")  # type: ignore[name-defined]

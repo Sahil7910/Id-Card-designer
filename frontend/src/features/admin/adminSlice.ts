@@ -6,14 +6,20 @@ import { api } from "../../shared/utils/api";
 
 export interface AdminOrderItem {
   id: string;
+  design_id: string | null;
+  thumbnail_url: string | null;
   card_type: string;
   printer: string;
+  print_side: string;
+  orientation: string;
   finish: string;
   chip_type: string;
   material: string;
   quantity: number;
   unit_price: number;
   total_price: number;
+  front_field_count: number;
+  back_field_count: number;
 }
 
 export interface AdminOrder {
@@ -21,14 +27,30 @@ export interface AdminOrder {
   order_number: string;
   status: string;
   grand_total: number;
+  subtotal: number;
+  promo_discount: number;
+  tax: number;
+  shipping_cost: number;
   total_cards: number;
   payment_method: string;
   shipping_method: string;
+  shipping_address: Record<string, string>;
+  tracking_number: string | null;
+  courier_name: string | null;
+  tracking_url: string | null;
   created_at: string | null;
+  updated_at: string | null;
   customer_email: string | null;
   customer_name: string | null;
+  customer_id: string | null;
   items: AdminOrderItem[];
 }
+
+export const ALL_ORDER_STATUSES = [
+  "ENQUIRY", "CONFIRM", "ONHOLD", "INPROGRESS", "REVIEW",
+  "PRINTING", "SHIPPING", "DISPATCHED",
+] as const;
+export type OrderStatus = typeof ALL_ORDER_STATUSES[number];
 
 export interface PricingConfig {
   key: string;
@@ -55,13 +77,20 @@ export interface AdminUser {
   company: string | null;
   is_admin: boolean;
   is_active: boolean;
+  role: string;
+  customer_code: string | null;
   created_at: string | null;
 }
+
+export const STAFF_ROLES = ["DESIGN", "PRINTING", "SHIPPING", "ADMIN"] as const;
+export type StaffRole = typeof STAFF_ROLES[number];
 
 export interface AdminStats {
   total_orders: number;
   total_revenue: number;
   total_users: number;
+  total_customers: number;
+  total_staff: number;
   active_templates: number;
   orders_by_status: Record<string, number>;
   revenue_last_30_days: number;
@@ -75,10 +104,12 @@ export interface AdminStats {
 interface AdminState {
   stats: AdminStats | null;
   orders: AdminOrder[];
+  orderDetail: AdminOrder | null;
   pricingConfig: PricingConfig[];
   cardOptions: CardOption[];
   users: AdminUser[];
   loading: boolean;
+  detailLoading: boolean;
   error: string | null;
 }
 
@@ -145,13 +176,64 @@ export const deleteCardOption = createAsyncThunk(
 export const updateOrderStatus = createAsyncThunk(
   "admin/updateOrderStatus",
   async ({ id, status }: { id: string; status: string }) => {
-    return api.put<AdminOrder>(`/api/orders/${id}/status`, { status });
+    const result = await api.patch<{ id: string; status: string }>(`/api/orders/${id}/status`, { status });
+    return result;
+  }
+);
+
+export const fetchAdminOrderDetail = createAsyncThunk(
+  "admin/fetchOrderDetail",
+  async (orderId: string) => {
+    return api.get<AdminOrder>(`/api/admin/orders/${orderId}`);
   }
 );
 
 export const fetchAdminUsers = createAsyncThunk("admin/fetchUsers", async () => {
   return api.get<AdminUser[]>("/api/admin/users");
 });
+
+export const createStaffUser = createAsyncThunk(
+  "admin/createStaffUser",
+  async (
+    data: { email: string; password: string; first_name?: string; last_name?: string; role: StaffRole },
+    { rejectWithValue }
+  ) => {
+    try {
+      return await api.post<AdminUser>("/api/admin/users", data);
+    } catch (err: unknown) {
+      const detail = (err as { message?: string })?.message ?? "Failed to create user";
+      return rejectWithValue(detail);
+    }
+  }
+);
+
+export const updateAdminUser = createAsyncThunk(
+  "admin/updateAdminUser",
+  async (
+    { id, ...data }: { id: string; role?: string; is_active?: boolean; first_name?: string; last_name?: string },
+    { rejectWithValue }
+  ) => {
+    try {
+      return await api.put<AdminUser>(`/api/admin/users/${id}`, data);
+    } catch (err: unknown) {
+      const detail = (err as { message?: string })?.message ?? "Failed to update user";
+      return rejectWithValue(detail);
+    }
+  }
+);
+
+export const deactivateUser = createAsyncThunk(
+  "admin/deactivateUser",
+  async (id: string, { rejectWithValue }) => {
+    try {
+      await api.del(`/api/admin/users/${id}`);
+      return id;
+    } catch (err: unknown) {
+      const detail = (err as { message?: string })?.message ?? "Failed to deactivate user";
+      return rejectWithValue(detail);
+    }
+  }
+);
 
 export const toggleTemplate = createAsyncThunk(
   "admin/toggleTemplate",
@@ -173,10 +255,12 @@ export const deleteTemplate = createAsyncThunk(
 const initialState: AdminState = {
   stats: null,
   orders: [],
+  orderDetail: null,
   pricingConfig: [],
   cardOptions: [],
   users: [],
   loading: false,
+  detailLoading: false,
   error: null,
 };
 
@@ -243,14 +327,42 @@ const adminSlice = createSlice({
       .addCase(updateOrderStatus.fulfilled, (state, action) => {
         const idx = state.orders.findIndex((o) => o.id === action.payload.id);
         if (idx !== -1) state.orders[idx].status = action.payload.status;
+        // Also update the detail view if it's open
+        if (state.orderDetail?.id === action.payload.id) {
+          state.orderDetail.status = action.payload.status;
+        }
       })
+
+      .addCase(fetchAdminOrderDetail.pending, (state) => { state.detailLoading = true; })
+      .addCase(fetchAdminOrderDetail.fulfilled, (state, action) => {
+        state.detailLoading = false;
+        state.orderDetail = action.payload;
+      })
+      .addCase(fetchAdminOrderDetail.rejected, (state) => { state.detailLoading = false; })
 
       .addCase(fetchAdminUsers.pending, pending)
       .addCase(fetchAdminUsers.fulfilled, (state, action) => {
         state.loading = false;
         state.users = action.payload;
       })
-      .addCase(fetchAdminUsers.rejected, rejected);
+      .addCase(fetchAdminUsers.rejected, rejected)
+
+      .addCase(createStaffUser.fulfilled, (state, action) => {
+        state.users.unshift(action.payload);
+      })
+      .addCase(createStaffUser.rejected, (state, action) => {
+        state.error = (action.payload as string) ?? "Failed to create user";
+      })
+
+      .addCase(updateAdminUser.fulfilled, (state, action) => {
+        const idx = state.users.findIndex((u) => u.id === action.payload.id);
+        if (idx !== -1) state.users[idx] = action.payload;
+      })
+
+      .addCase(deactivateUser.fulfilled, (state, action) => {
+        const idx = state.users.findIndex((u) => u.id === action.payload);
+        if (idx !== -1) state.users[idx].is_active = false;
+      });
   },
 });
 
@@ -260,8 +372,10 @@ export default adminSlice.reducer;
 // ── Selectors ──────────────────────────────────────────────────────────────────
 export const selectAdminStats = (state: RootState) => state.admin.stats;
 export const selectAdminOrders = (state: RootState) => state.admin.orders;
+export const selectAdminOrderDetail = (state: RootState) => state.admin.orderDetail;
 export const selectPricingConfig = (state: RootState) => state.admin.pricingConfig;
 export const selectCardOptions = (state: RootState) => state.admin.cardOptions;
 export const selectAdminUsers = (state: RootState) => state.admin.users;
 export const selectAdminLoading = (state: RootState) => state.admin.loading;
+export const selectAdminDetailLoading = (state: RootState) => state.admin.detailLoading;
 export const selectAdminError = (state: RootState) => state.admin.error;

@@ -15,6 +15,18 @@ class TemplateCreate(BaseModel):
     orientation: str = "Horizontal"
 
 
+class UserTemplateCreate(BaseModel):
+    """Used by authenticated customers to save personal templates from the designer."""
+    name: str
+    front_fields: list[dict] = []
+    back_fields: list[dict] = []
+    front_bg_url: str | None = None
+    back_bg_url: str | None = None
+    orientation: str = "Horizontal"
+    accent_color: str | None = None
+    bg_color: str | None = None
+
+
 class TemplateUpdate(BaseModel):
     name: str | None = None
     category: str | None = None
@@ -41,5 +53,6 @@ class TemplateResponse(BaseModel):
     orientation: str
     is_active: bool
     created_at: datetime | None
+    user_id: str | None = None
 
     model_config = ConfigDict(from_attributes=True)

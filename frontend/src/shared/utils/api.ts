@@ -1,3 +1,5 @@
+import { API_BASE } from "./apiBase";
+
 const TOKEN_KEY = "idcard_token";
 const REFRESH_KEY = "idcard_refresh_token";
 
@@ -29,7 +31,8 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
   const token = getToken();
   if (token) headers["Authorization"] = `Bearer ${token}`;
 
-  let res = await fetch(path, {
+  const url = `${API_BASE}${path}`;
+  let res = await fetch(url, {
     method,
     headers,
     body: body !== undefined ? JSON.stringify(body) : undefined,
@@ -39,7 +42,7 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
   if (res.status === 401) {
     const refreshToken = getRefreshToken();
     if (refreshToken) {
-      const refreshRes = await fetch("/api/auth/refresh", {
+      const refreshRes = await fetch(`${API_BASE}/api/auth/refresh`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ refresh_token: refreshToken }),
@@ -48,7 +51,7 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
         const tokens = await refreshRes.json() as { access_token: string; refresh_token: string };
         setTokens(tokens.access_token, tokens.refresh_token);
         headers["Authorization"] = `Bearer ${tokens.access_token}`;
-        res = await fetch(path, {
+        res = await fetch(url, {
           method,
           headers,
           body: body !== undefined ? JSON.stringify(body) : undefined,
@@ -84,5 +87,39 @@ export const api = {
   get: <T>(path: string) => request<T>("GET", path),
   post: <T>(path: string, body?: unknown) => request<T>("POST", path, body),
   put: <T>(path: string, body?: unknown) => request<T>("PUT", path, body),
+  patch: <T>(path: string, body?: unknown) => request<T>("PATCH", path, body),
   del: <T>(path: string) => request<T>("DELETE", path),
 };
+
+/**
+ * Upload a file using multipart/form-data.
+ * Must NOT set Content-Type header — let the browser set it with the boundary.
+ */
+export async function uploadFile<T = unknown>(path: string, formData: FormData): Promise<T> {
+  const headers: Record<string, string> = {};
+  const token = getToken();
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: "POST",
+    headers,
+    body: formData,
+  });
+
+  if (!res.ok) {
+    let detail = "Upload failed";
+    try {
+      const errBody = await res.json() as { detail?: unknown };
+      if (Array.isArray(errBody.detail)) {
+        const first = (errBody.detail as { msg?: string }[])[0];
+        detail = first?.msg ?? "Validation error";
+      } else if (typeof errBody.detail === "string") {
+        detail = errBody.detail;
+      }
+    } catch { /* non-JSON */ }
+    throw Object.assign(new Error(detail), { status: res.status });
+  }
+
+  if (res.status === 204) return undefined as T;
+  return (await res.json()) as T;
+}

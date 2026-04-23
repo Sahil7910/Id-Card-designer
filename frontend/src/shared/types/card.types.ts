@@ -1,7 +1,9 @@
 // ── Field Types ──────────────────────────────────────────────────
 export type FieldType =
   | "name" | "title" | "company" | "photo"
-  | "id" | "email" | "phone" | "barcode" | "logo" | "address";
+  | "id" | "email" | "phone" | "barcode" | "address"
+  | "text"   // flexible free-text label
+  | "qr";    // QR code
 
 export interface CardField {
   id: string;
@@ -25,6 +27,14 @@ export interface CardField {
   shadowColor?: string;
   shadowSize?: number;
   imageUrl?: string;
+  // Photo enhancements
+  imageFit?: "cover" | "contain" | "fill";
+  imageScale?: number;
+  imageOffsetX?: number;
+  imageOffsetY?: number;
+  // Barcode / QR data
+  barcodeValue?: string;
+  qrValue?: string;
 }
 
 export interface CardTemplate {
@@ -58,5 +68,5 @@ export type DragState =
   | { id: string; mode: "resize"; handle: RHandle; startX: number; startY: number; origX: number; origY: number; origW: number; origH: number };
 
 export const TEXT_TYPES: FieldType[] = [
-  "name", "title", "company", "id", "email", "phone", "address",
+  "name", "title", "company", "id", "email", "phone", "address", "text",
 ];

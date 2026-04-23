@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 
 class ShippingAddress(BaseModel):
@@ -78,4 +78,40 @@ class OrderResponse(BaseModel):
 
 
 class OrderStatusUpdate(BaseModel):
-    status: Literal["confirmed", "printing", "packaging", "shipped", "delivered"]
+    status: Literal[
+        "ENQUIRY", "CONFIRM", "ONHOLD", "INPROGRESS", "REVIEW",
+        "PRINTING", "SHIPPING", "DISPATCHED",
+    ]
+    note: str | None = None
+
+
+class AuditLogResponse(BaseModel):
+    id: str
+    order_id: str
+    old_status: str | None
+    new_status: str
+    changed_by: str | None
+    changed_by_role: str | None
+    note: str | None
+    changed_at: datetime | None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class AttachmentResponse(BaseModel):
+    id: str
+    order_id: str
+    file_name: str
+    file_url: str
+    file_type: str
+    uploaded_by: str | None
+    created_at: datetime | None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class TrackingUpdate(BaseModel):
+    tracking_number: str | None = None
+    courier_name: str | None = None
+    tracking_url: str | None = None
+    note: str | None = None

@@ -4,6 +4,7 @@ import cartReducer from "../features/cart/cartSlice";
 import authReducer from "../features/auth/authSlice";
 import adminReducer from "../features/admin/adminSlice";
 import configReducer from "../features/config/configSlice";
+import workflowReducer from "../features/workflow/workflowSlice";
 
 export const store = configureStore({
   reducer: {
@@ -12,6 +13,7 @@ export const store = configureStore({
     auth: authReducer,
     admin: adminReducer,
     config: configReducer,
+    workflow: workflowReducer,
   },
 });
 

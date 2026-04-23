@@ -1,6 +1,9 @@
 import { useState, useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
+import { store } from "../../app/store";
 import { useAppDispatch, useAppSelector } from "../../app/hooks";
+// import { useGoogleLogin } from "@react-oauth/google";  // TODO: Phase 2 — Google OAuth
 import { login, register, forgotPassword, authActions } from "../../features/auth/authSlice";
 
 type AuthMode = "login" | "signup";
@@ -34,12 +37,16 @@ const AuthInput = ({ label, type, value, onChange, placeholder, icon, ref }: {
 
 function AuthModalInner({ mode, onClose, onSwitch }: { mode: AuthMode; onClose: () => void; onSwitch: (m: AuthMode) => void }) {
   const dispatch = useAppDispatch();
+  const navigate = useNavigate();
   const [form, setForm] = useState<AuthForm>({ name: "", email: "", password: "", confirm: "" });
   const [showPass, setShowPass] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // TODO: Phase 2 — Google OAuth (enable after adding authorized origins in Google Cloud Console)
+  // const handleGoogleLogin = useGoogleLogin({ ... });
 
   // Forgot password local state
   const [view, setView] = useState<"auth" | "forgot" | "forgot-sent">("auth");
@@ -82,7 +89,21 @@ function AuthModalInner({ mode, onClose, onSwitch }: { mode: AuthMode; onClose: 
         })).unwrap();
       }
       setSuccess(true);
-      setTimeout(onClose, 1200);
+      setTimeout(() => {
+        onClose();
+        // Redirect users based on their role
+        if (mode === "login") {
+          const authUser = store.getState().auth.user;
+          const roleRedirects: Record<string, string> = {
+            ADMIN: "/admin",
+            DESIGN: "/design-queue",
+            PRINTING: "/print-queue",
+            SHIPPING: "/shipping-queue",
+          };
+          const redirect = roleRedirects[authUser?.role ?? ""];
+          if (redirect) navigate(redirect);
+        }
+      }, 900);
     } catch (err: unknown) {
       const errAny = err as { message?: string };
       setError(errAny?.message ?? "Something went wrong. Please try again.");
@@ -185,11 +206,12 @@ function AuthModalInner({ mode, onClose, onSwitch }: { mode: AuthMode; onClose: 
             </div>
           ) : (
             <>
+              {/* TODO: Phase 2 — re-enable Google/LinkedIn OAuth after configuring Google Cloud Console */}
               <div style={{ display: "flex", gap: 10, marginBottom: 22 }}>
                 {[{ icon: "G", label: "Google", bg: "#4285f4" }, { icon: "in", label: "LinkedIn", bg: "#0a66c2" }].map(btn => (
-                  <button key={btn.label} style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "10px 14px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.04)", color: "#e2e8f0", cursor: "pointer", fontSize: 13, fontWeight: 600, transition: "all 0.2s" }}
-                    onMouseEnter={e => { e.currentTarget.style.background = "rgba(255,255,255,0.08)"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.2)"; }}
-                    onMouseLeave={e => { e.currentTarget.style.background = "rgba(255,255,255,0.04)"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.1)"; }}>
+                  <button key={btn.label} disabled
+                    title="Coming soon"
+                    style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "10px 14px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.04)", color: "#e2e8f0", cursor: "not-allowed", fontSize: 13, fontWeight: 600, opacity: 0.4 }}>
                     <span style={{ width: 20, height: 20, borderRadius: 5, background: btn.bg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 900, color: "#fff" }}>{btn.icon}</span>
                     {btn.label}
                   </button>

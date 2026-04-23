@@ -108,7 +108,7 @@ export default function Checkout({
           finish: item.finish,
           material: item.material,
           quantity: item.quantity,
-          design_id: null,
+          design_id: item.designId ?? null,
           front_field_count: item.frontFieldCount,
           back_field_count: item.backFieldCount,
         })),

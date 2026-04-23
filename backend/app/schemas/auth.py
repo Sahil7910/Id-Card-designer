@@ -47,6 +47,8 @@ class UserResponse(BaseModel):
     company: str | None
     phone: str | None
     is_admin: bool
+    role: str = "CUSTOMER"
+    customer_code: str | None = None
     created_at: datetime | None
 
     model_config = ConfigDict(from_attributes=True)
@@ -57,6 +59,10 @@ class UserUpdate(BaseModel):
     last_name: str | None = None
     company: str | None = None
     phone: str | None = None
+
+
+class GoogleAuthRequest(BaseModel):
+    access_token: str
 
 
 class ForgotPasswordRequest(BaseModel):

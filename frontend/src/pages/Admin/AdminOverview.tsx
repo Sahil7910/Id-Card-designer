@@ -1,14 +1,18 @@
 import { useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
+import { useNavigate } from "react-router-dom";
 import type { AppDispatch } from "../../app/store";
 import { fetchAdminStats, selectAdminStats, selectAdminLoading } from "../../features/admin/adminSlice";
 
 const STATUS_COLORS: Record<string, string> = {
-  confirmed: "#3b82f6",
-  printing: "#f59e0b",
-  packaging: "#8b5cf6",
-  shipped: "#06b6d4",
-  delivered: "#22c55e",
+  ENQUIRY:    "#94a3b8",
+  CONFIRM:    "#3b82f6",
+  ONHOLD:     "#f59e0b",
+  INPROGRESS: "#fb923c",
+  REVIEW:     "#facc15",
+  PRINTING:   "#8b5cf6",
+  SHIPPING:   "#06b6d4",
+  DISPATCHED: "#22c55e",
 };
 
 function StatCard({ label, value, sub }: { label: string; value: string | number; sub?: string }) {
@@ -48,6 +52,7 @@ function BarChart({ items, total }: { items: { value: string; count: number }[];
 
 export default function AdminOverview() {
   const dispatch = useDispatch<AppDispatch>();
+  const navigate = useNavigate();
   const stats = useSelector(selectAdminStats);
   const loading = useSelector(selectAdminLoading);
 
@@ -73,10 +78,11 @@ export default function AdminOverview() {
       <h1 style={{ fontSize: 24, fontWeight: 700, color: "#e2e8f0", marginBottom: 24, marginTop: 0 }}>Overview</h1>
 
       {/* Stat cards */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 16, marginBottom: 32 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 16, marginBottom: 32 }}>
         <StatCard label="Total Orders" value={stats.total_orders} />
         <StatCard label="Total Revenue" value={`₹${stats.total_revenue.toFixed(2)}`} />
-        <StatCard label="Total Users" value={stats.total_users} />
+        <StatCard label="Customers" value={stats.total_customers} sub={`${stats.total_users} total users`} />
+        <StatCard label="Staff Accounts" value={stats.total_staff} />
         <StatCard label="Active Templates" value={stats.active_templates} />
         <StatCard
           label="Orders (Last 30 Days)"
@@ -134,25 +140,28 @@ export default function AdminOverview() {
               </thead>
               <tbody>
                 {stats.recent_orders.map((order) => (
-                  <tr key={order.id} style={{ borderBottom: "1px solid #0f172a" }}>
-                    <td style={{ padding: "10px 12px 10px 0", color: "#e05c1a", fontWeight: 600 }}>{order.order_number}</td>
-                    <td style={{ padding: "10px 12px 10px 0", color: "#94a3b8" }}>{order.customer_email ?? "—"}</td>
+                  <tr
+                    key={order.id}
+                    onClick={() => navigate(`/admin/orders/${order.id}`)}
+                    style={{ borderBottom: "1px solid #0f172a", cursor: "pointer", transition: "background 0.1s" }}
+                    onMouseEnter={e => (e.currentTarget.style.background = "#13161d")}
+                    onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
+                  >
+                    <td style={{ padding: "10px 12px 10px 0", color: "#e05c1a", fontWeight: 600 }}>#{order.order_number}</td>
+                    <td style={{ padding: "10px 12px 10px 0", color: "#94a3b8", fontSize: 12 }}>{order.customer_email ?? "—"}</td>
                     <td style={{ padding: "10px 12px 10px 0", color: "#e2e8f0", fontWeight: 600 }}>₹{order.grand_total.toFixed(2)}</td>
                     <td style={{ padding: "10px 12px 10px 0", color: "#94a3b8" }}>{order.total_cards}</td>
                     <td style={{ padding: "10px 12px 10px 0" }}>
                       <span style={{
                         background: `${STATUS_COLORS[order.status] ?? "#64748b"}22`,
                         color: STATUS_COLORS[order.status] ?? "#64748b",
-                        padding: "2px 8px",
-                        borderRadius: 6,
-                        fontSize: 12,
-                        fontWeight: 600,
-                        textTransform: "capitalize",
+                        padding: "2px 8px", borderRadius: 6,
+                        fontSize: 11, fontWeight: 600, letterSpacing: 0.3,
                       }}>
-                        {order.status}
+                        {order.status.replace("_", " ")}
                       </span>
                     </td>
-                    <td style={{ padding: "10px 0", color: "#64748b" }}>
+                    <td style={{ padding: "10px 0", color: "#64748b", fontSize: 12 }}>
                       {order.created_at ? new Date(order.created_at).toLocaleDateString() : "—"}
                     </td>
                   </tr>

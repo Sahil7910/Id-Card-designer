@@ -1,5 +1,7 @@
 import hashlib
+import secrets
 
+import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from app.limiter import limiter
 from sqlalchemy import select
@@ -11,6 +13,7 @@ from app.dependencies import get_current_user
 from app.models.user import User
 from app.schemas.auth import (
     ForgotPasswordRequest,
+    GoogleAuthRequest,
     LoginRequest,
     RefreshRequest,
     RegisterRequest,
@@ -146,3 +149,57 @@ async def reset_password(data: ResetPasswordRequest, db: AsyncSession = Depends(
     user.password_hash = hash_password(data.new_password)
     await db.flush()
     return {"message": "Password updated successfully. You can now sign in."}
+
+
+@router.post("/google", response_model=TokenResponse)
+@limiter.limit("10/minute")
+async def google_auth(request: Request, data: GoogleAuthRequest, db: AsyncSession = Depends(get_db)):
+    # Verify access token with Google and fetch user info
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(
+            "https://www.googleapis.com/oauth2/v3/userinfo",
+            headers={"Authorization": f"Bearer {data.access_token}"},
+        )
+    if resp.status_code != 200:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid Google token.")
+
+    info = resp.json()
+    google_id: str = info.get("sub", "")
+    email: str = info.get("email", "")
+    if not google_id or not email:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Google account has no email.")
+
+    # Try to find existing user by google_id first, then by email
+    result = await db.execute(select(User).where(User.google_id == google_id))
+    user = result.scalar_one_or_none()
+
+    if not user:
+        result = await db.execute(select(User).where(User.email == email))
+        user = result.scalar_one_or_none()
+
+    if user:
+        # Link google_id to existing email/password account if not already linked
+        if not user.google_id:
+            user.google_id = google_id
+            user.oauth_provider = "google"
+            await db.flush()
+        if not user.is_active:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account is disabled.")
+    else:
+        # Create new user from Google profile
+        name_parts = info.get("name", email.split("@")[0]).split(" ", 1)
+        user = User(
+            email=email,
+            password_hash=hash_password(secrets.token_hex(32)),
+            first_name=name_parts[0],
+            last_name=name_parts[1] if len(name_parts) > 1 else "",
+            google_id=google_id,
+            oauth_provider="google",
+        )
+        db.add(user)
+        await db.flush()
+
+    return TokenResponse(
+        access_token=create_access_token(user.id),
+        refresh_token=create_refresh_token(user.id),
+    )

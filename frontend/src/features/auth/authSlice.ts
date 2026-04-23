@@ -11,6 +11,8 @@ interface UserResponse {
   company: string | null;
   phone: string | null;
   is_admin: boolean;
+  role: "CUSTOMER" | "DESIGN" | "PRINTING" | "SHIPPING" | "ADMIN";
+  customer_code: string | null;
   created_at: string | null;
 }
 
@@ -58,6 +60,16 @@ export const forgotPassword = createAsyncThunk(
   "auth/forgotPassword",
   async (email: string) => {
     await api.post("/api/auth/forgot-password", { email });
+  },
+);
+
+export const googleAuth = createAsyncThunk(
+  "auth/googleAuth",
+  async (accessToken: string) => {
+    const tokens = await api.post<TokenResponse>("/api/auth/google", { access_token: accessToken });
+    setTokens(tokens.access_token, tokens.refresh_token);
+    const user = await api.get<UserResponse>("/api/auth/me");
+    return { token: tokens.access_token, user };
   },
 );
 
@@ -112,6 +124,18 @@ const authSlice = createSlice({
       state.error = (action.error.message) ?? "Login failed";
     });
 
+    // googleAuth
+    builder.addCase(googleAuth.pending, (state) => { state.isLoading = true; state.error = null; });
+    builder.addCase(googleAuth.fulfilled, (state, action) => {
+      state.isLoading = false;
+      state.token = action.payload.token;
+      state.user = action.payload.user;
+    });
+    builder.addCase(googleAuth.rejected, (state, action) => {
+      state.isLoading = false;
+      state.error = action.error.message ?? "Google sign-in failed";
+    });
+
     // fetchUser
     builder.addCase(fetchUser.pending, (state) => { state.isLoading = true; });
     builder.addCase(fetchUser.fulfilled, (state, action) => {
@@ -133,3 +157,4 @@ export default authSlice.reducer;
 // ── Selectors ──────────────────────────────────────────────────────
 export const selectIsAuthenticated = (state: RootState) => !!state.auth.token && !!state.auth.user;
 export const selectAuthUser = (state: RootState) => state.auth.user;
+export const selectUserRole = (state: RootState) => state.auth.user?.role ?? null;

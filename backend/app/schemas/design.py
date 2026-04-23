@@ -28,6 +28,7 @@ class DesignUpdate(BaseModel):
     material: Literal["PVC Plastic", "Paper", "Composite"] | None = None
     front_fields: list[dict] | None = None
     back_fields: list[dict] | None = None
+    thumbnail_url: str | None = None
 
 
 class DesignResponse(BaseModel):
