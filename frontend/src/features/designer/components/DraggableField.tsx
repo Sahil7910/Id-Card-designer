@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import type { CardField, RHandle } from "../../../shared/types";
 import { TEXT_TYPES } from "../../../shared/types";
 import { FIELD_COLORS, HANDLES } from "../constants";
@@ -23,7 +23,6 @@ export function DraggableField({ field, isSelected, onMouseDown, onResizeDown, i
   const fieldRef = useRef(field);
   fieldRef.current = field;
   const isPhotoLike = field.type === "photo";
-  const [hovered, setHovered] = useState(false);
 
   // Non-passive wheel listener for scroll-to-zoom
   useEffect(() => {
