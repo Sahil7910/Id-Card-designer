@@ -25,7 +25,7 @@ def upgrade() -> None:
     op.create_index("ix_users_customer_code", "users", ["customer_code"], unique=True)
 
     # Backfill: existing admins get role='admin'
-    op.execute("UPDATE users SET role='admin' WHERE is_admin=1")
+    op.execute("UPDATE users SET role='admin' WHERE is_admin=true")
 
     # Serial counter table for per-customer order numbering
     op.create_table(
