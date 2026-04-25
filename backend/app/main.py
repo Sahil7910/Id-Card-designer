@@ -1,3 +1,4 @@
+import os
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
@@ -80,6 +81,7 @@ app.include_router(design_queue.router, prefix="/api/design-queue", tags=["Desig
 app.include_router(print_queue.router, prefix="/api/print-queue", tags=["Print Queue"])
 app.include_router(shipping_queue.router, prefix="/api/shipping-queue", tags=["Shipping Queue"])
 
+os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
 app.mount("/uploads", StaticFiles(directory=settings.UPLOAD_DIR), name="uploads")
 
 
