@@ -2,6 +2,7 @@ import type { FieldType, RHandle } from "../../shared/types";
 
 export const FIELD_TEMPLATES: { type: FieldType; label: string; icon: string; defaultW: number; defaultH: number }[] = [
   { type: "photo",   label: "Photo",      icon: "\u{1F464}", defaultW: 22, defaultH: 30 },
+  { type: "logo",    label: "Logo",       icon: "\u{1F3E2}", defaultW: 30, defaultH: 15 },
   { type: "name",    label: "Full Name",  icon: "\u270F\uFE0F",  defaultW: 55, defaultH: 10 },
   { type: "title",   label: "Job Title",  icon: "\u{1F3F7}\uFE0F",  defaultW: 55, defaultH: 8  },
   { type: "company", label: "Company",    icon: "\u{1F3E2}", defaultW: 50, defaultH: 8  },
@@ -16,6 +17,7 @@ export const FIELD_TEMPLATES: { type: FieldType; label: string; icon: string; de
 
 export const FIELD_COLORS: Record<FieldType, string> = {
   photo:   "#6366f1",
+  logo:    "#10b981",
   name:    "#e05c1a",
   title:   "#0ea5e9",
   company: "#8b5cf6",

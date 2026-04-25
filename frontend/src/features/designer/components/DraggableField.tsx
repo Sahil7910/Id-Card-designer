@@ -23,7 +23,7 @@ export function DraggableField({ field, isSelected, onMouseDown, onResizeDown, i
   const photoRef = useRef<HTMLDivElement>(null);
   const fieldRef = useRef(field);
   fieldRef.current = field;
-  const isPhotoLike = field.type === "photo";
+  const isPhotoLike = field.type === "photo" || field.type === "logo";
   const [editing, setEditing] = useState(false);
 
   // Non-passive wheel listener for scroll-to-zoom
@@ -101,11 +101,11 @@ export function DraggableField({ field, isSelected, onMouseDown, onResizeDown, i
           {field.imageUrl ? (
             <img
               src={field.imageUrl}
-              alt="Photo"
+              alt={field.type === "logo" ? "Logo" : "Photo"}
               style={{
                 position: "absolute", inset: 0,
                 width: "100%", height: "100%",
-                objectFit: field.imageFit ?? "cover",
+                objectFit: field.imageFit ?? (field.type === "logo" ? "contain" : "cover"),
                 transformOrigin: "center center",
                 transform: `scale(${field.imageScale ?? 1}) translate(${field.imageOffsetX ?? 0}%, ${field.imageOffsetY ?? 0}%)`,
                 display: "block",
@@ -114,7 +114,7 @@ export function DraggableField({ field, isSelected, onMouseDown, onResizeDown, i
             />
           ) : (
             <>
-              <span style={{ fontSize: 22, opacity: 0.45 }}>{"👤"}</span>
+              <span style={{ fontSize: 22, opacity: 0.45 }}>{field.type === "logo" ? "🏢" : "👤"}</span>
               <span style={{ fontSize: 8, color, fontWeight: 700, opacity: 0.6, letterSpacing: 0.5, marginTop: 2 }}>
                 {"CLICK TO UPLOAD"}
               </span>

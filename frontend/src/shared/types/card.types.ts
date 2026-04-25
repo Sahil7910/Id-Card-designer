@@ -1,6 +1,6 @@
 // ── Field Types ──────────────────────────────────────────────────
 export type FieldType =
-  | "name" | "title" | "company" | "photo"
+  | "name" | "title" | "company" | "photo" | "logo"
   | "id" | "email" | "phone" | "barcode" | "address"
   | "text"   // flexible free-text label
   | "qr";    // QR code

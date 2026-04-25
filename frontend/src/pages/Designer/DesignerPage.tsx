@@ -164,7 +164,7 @@ export default function IDCardDesigner() {
       const step = e.shiftKey ? 5 : 1;
       const dx = e.key === "ArrowLeft" ? -step : e.key === "ArrowRight" ? step : 0;
       const dy = e.key === "ArrowUp" ? -step : e.key === "ArrowDown" ? step : 0;
-      if (field.type === "photo") {
+      if (field.type === "photo" || field.type === "logo") {
         // Arrow keys pan the image inside the field
         updateField(field.id, {
           imageOffsetX: Math.round(Math.max(-50, Math.min(50, (field.imageOffsetX ?? 0) + dx))),
@@ -490,10 +490,11 @@ export default function IDCardDesigner() {
                         <div style={{ position: "absolute", top: "calc(100% + 6px)", left: 0, right: 0, background: "#1a1e28", border: "1px solid #3a3f52", borderRadius: 9, zIndex: 200, overflow: "hidden", boxShadow: "0 8px 32px rgba(0,0,0,0.55)" }}>
                           <div style={{ padding: "8px 12px 5px", fontSize: 9, fontWeight: 700, color: "#475569", letterSpacing: 1.5 }}>ADD FIELD</div>
                           {([
-                            { type: "photo",   icon: "👤", label: "Photo",      desc: "Upload a person photo",     color: "#6366f1" },
-                            { type: "text",    icon: "T",  label: "Text Label", desc: "Any text — name, title…",   color: "#e05c1a" },
-                            { type: "barcode", icon: "▦",  label: "Barcode",    desc: "CODE128 scannable barcode", color: "#64748b" },
-                            { type: "qr",      icon: "⬛", label: "QR Code",   desc: "URL or text as QR code",    color: "#0f172a" },
+                            { type: "photo",   icon: "👤", label: "Photo",      desc: "Upload a person photo",        color: "#6366f1" },
+                            { type: "logo",    icon: "🏢", label: "Logo",       desc: "Company or organization logo", color: "#10b981" },
+                            { type: "text",    icon: "T",  label: "Text Label", desc: "Any text — name, title…",      color: "#e05c1a" },
+                            { type: "barcode", icon: "▦",  label: "Barcode",    desc: "CODE128 scannable barcode",    color: "#64748b" },
+                            { type: "qr",      icon: "⬛", label: "QR Code",   desc: "URL or text as QR code",       color: "#0f172a" },
                           ] as const).map((t, i, arr) => (
                             <button key={t.type}
                               onClick={() => dispatch(designerActions.addField(t.type))}
@@ -687,25 +688,33 @@ export default function IDCardDesigner() {
                     </>
                   )}
 
-                  {selectedField.type === "photo" && (
+                  {(selectedField.type === "photo" || selectedField.type === "logo") && (
                     <>
                       <div style={{ height: 1, background: "#2a2f3e", margin: "6px 0 12px" }} />
-                      <div style={{ fontSize: 10, fontWeight: 700, color: "#6366f1", letterSpacing: 1.5, marginBottom: 10 }}>PHOTO</div>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: selectedField.type === "logo" ? "#10b981" : "#6366f1", letterSpacing: 1.5, marginBottom: 10 }}>
+                        {selectedField.type === "logo" ? "LOGO" : "PHOTO"}
+                      </div>
 
                       {selectedField.imageUrl ? (
                         <div style={{ position: "relative", marginBottom: 12 }}>
                           <img src={selectedField.imageUrl} alt="Uploaded"
-                            style={{ width: "100%", height: 100, objectFit: "cover", borderRadius: 8, border: "1px solid #2a2f3e", display: "block" }} />
+                            style={{ width: "100%", height: 100, objectFit: selectedField.type === "logo" ? "contain" : "cover", borderRadius: 8, border: "1px solid #2a2f3e", display: "block", background: selectedField.type === "logo" ? "#ffffff11" : undefined }} />
                           <button onClick={() => updateField(selectedField.id, { imageUrl: undefined })}
                             style={{ position: "absolute", top: 6, right: 6, background: "#ef444499", border: "none", color: "#fff", borderRadius: 6, width: 24, height: 24, cursor: "pointer", fontSize: 11, display: "flex", alignItems: "center", justifyContent: "center" }}>{"\u2715"}</button>
-                          <div style={{ position: "absolute", bottom: 6, left: 6, background: "#16a34a", borderRadius: 4, padding: "2px 7px", fontSize: 9, fontWeight: 700, color: "#fff" }}>{"\u2713"} Photo uploaded</div>
+                          <div style={{ position: "absolute", bottom: 6, left: 6, background: "#16a34a", borderRadius: 4, padding: "2px 7px", fontSize: 9, fontWeight: 700, color: "#fff" }}>
+                            {"\u2713"} {selectedField.type === "logo" ? "Logo uploaded" : "Photo uploaded"}
+                          </div>
                         </div>
                       ) : (
-                        <label style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 8, border: "2px dashed #6366f133", background: "#13161d", cursor: "pointer", marginBottom: 12 }}>
-                          <span style={{ fontSize: 20, opacity: 0.4 }}>{"\u{1F464}"}</span>
+                        <label style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 8, border: `2px dashed ${selectedField.type === "logo" ? "#10b98133" : "#6366f133"}`, background: "#13161d", cursor: "pointer", marginBottom: 12 }}>
+                          <span style={{ fontSize: 20, opacity: 0.4 }}>{selectedField.type === "logo" ? "🏢" : "\u{1F464}"}</span>
                           <div>
-                            <div style={{ fontSize: 11, color: "#6366f1", fontWeight: 600, marginBottom: 2 }}>Upload Photo</div>
-                            <div style={{ fontSize: 9, color: "#475569" }}>Click here or click the photo frame on canvas</div>
+                            <div style={{ fontSize: 11, color: selectedField.type === "logo" ? "#10b981" : "#6366f1", fontWeight: 600, marginBottom: 2 }}>
+                              {selectedField.type === "logo" ? "Upload Logo" : "Upload Photo"}
+                            </div>
+                            <div style={{ fontSize: 9, color: "#475569" }}>
+                              {selectedField.type === "logo" ? "Click here or click the logo frame on canvas" : "Click here or click the photo frame on canvas"}
+                            </div>
                           </div>
                           <input type="file" accept="image/*" style={{ display: "none" }}
                             onChange={e => {
@@ -720,7 +729,9 @@ export default function IDCardDesigner() {
                       )}
 
                       <div style={{ height: 1, background: "#2a2f3e", margin: "0 0 12px" }} />
-                      <div style={{ fontSize: 10, fontWeight: 700, color: "#6366f1", letterSpacing: 1.5, marginBottom: 10 }}>PHOTO BORDER</div>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: selectedField.type === "logo" ? "#10b981" : "#6366f1", letterSpacing: 1.5, marginBottom: 10 }}>
+                        {selectedField.type === "logo" ? "LOGO BORDER" : "PHOTO BORDER"}
+                      </div>
                       <FieldRow label="Border Style">
                         <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
                           {(["none", "solid", "dashed", "dotted", "double"] as const).map(s => {
@@ -782,27 +793,31 @@ export default function IDCardDesigner() {
                       </FieldRow>
                       <div style={{ display: "flex", justifyContent: "center", marginTop: 8 }}>
                         <div style={{ width: 60, height: 72, background: "#e2e8f0", border: (selectedField.borderStyle ?? "none") !== "none" ? `${selectedField.borderWidth ?? 2}px ${selectedField.borderStyle} ${selectedField.borderColor ?? "#1e293b"}` : "1px dashed #94a3b8", borderRadius: selectedField.borderRadius ?? 6, boxShadow: (selectedField.shadowSize ?? 0) > 0 ? `0 ${selectedField.shadowSize}px ${(selectedField.shadowSize ?? 6) * 2}px ${selectedField.shadowColor ?? "#00000055"}` : "none", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 2, transition: "all 0.2s" }}>
-                          <span style={{ fontSize: 20, opacity: 0.4 }}>{"\u{1F464}"}</span>
+                          <span style={{ fontSize: 20, opacity: 0.4 }}>{selectedField.type === "logo" ? "🏢" : "\u{1F464}"}</span>
                           <span style={{ fontSize: 7, color: "#64748b", fontWeight: 700 }}>PREVIEW</span>
                         </div>
                       </div>
 
-                      {/* Photo zoom/fit/pan */}
+                      {/* Image zoom/fit/pan */}
                       <div style={{ height: 1, background: "#2a2f3e", margin: "12px 0" }} />
-                      <div style={{ fontSize: 10, fontWeight: 700, color: "#6366f1", letterSpacing: 1.5, marginBottom: 10 }}>IMAGE FIT &amp; ZOOM</div>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: selectedField.type === "logo" ? "#10b981" : "#6366f1", letterSpacing: 1.5, marginBottom: 10 }}>IMAGE FIT &amp; ZOOM</div>
                       <FieldRow label="Image Fit">
                         <div style={{ display: "flex", gap: 5 }}>
                           {(["cover", "contain", "fill"] as const).map(fit => {
-                            const active = (selectedField.imageFit ?? "cover") === fit;
+                            const defaultFit = selectedField.type === "logo" ? "contain" : "cover";
+                            const active = (selectedField.imageFit ?? defaultFit) === fit;
+                            const accent = selectedField.type === "logo" ? "#10b981" : "#6366f1";
                             return <button key={fit} onClick={() => updateField(selectedField.id, { imageFit: fit })}
-                              style={{ flex: 1, padding: "5px 0", borderRadius: 5, border: `1px solid ${active ? "#6366f1" : "#2a2f3e"}`, background: active ? "#6366f122" : "#13161d", color: active ? "#6366f1" : "#64748b", cursor: "pointer", fontSize: 10, fontWeight: 600, textTransform: "capitalize" }}>
+                              style={{ flex: 1, padding: "5px 0", borderRadius: 5, border: `1px solid ${active ? accent : "#2a2f3e"}`, background: active ? accent + "22" : "#13161d", color: active ? accent : "#64748b", cursor: "pointer", fontSize: 10, fontWeight: 600, textTransform: "capitalize" }}>
                               {fit}
                             </button>;
                           })}
                         </div>
                       </FieldRow>
                       <div style={{ background: "#13161d", border: "1px solid #2a2f3e", borderRadius: 7, padding: "8px 10px", display: "flex", flexDirection: "column", gap: 4 }}>
-                        <div style={{ fontSize: 9, color: "#6366f1", fontWeight: 700, letterSpacing: 0.5 }}>🖱 Scroll on photo to zoom</div>
+                        <div style={{ fontSize: 9, color: selectedField.type === "logo" ? "#10b981" : "#6366f1", fontWeight: 700, letterSpacing: 0.5 }}>
+                          {selectedField.type === "logo" ? "🖱 Scroll on logo to zoom" : "🖱 Scroll on photo to zoom"}
+                        </div>
                         <div style={{ fontSize: 9, color: "#64748b" }}>⬆⬇⬅➡ Arrow keys to pan image</div>
                       </div>
                     </>
