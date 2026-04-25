@@ -223,15 +223,15 @@ const HomePage = () => {
   const isAuthenticated = useAppSelector(selectIsAuthenticated);
   const user = useAppSelector(selectAuthUser);
   const isLoading = useAppSelector((s) => s.auth.isLoading);
-  const [pendingPath, setPendingPath] = useState<string | null>(null);
+  const pendingPath = useAppSelector((s) => s.auth.pendingPath);
 
   // Once the user becomes authenticated, complete any pending navigation
   useEffect(() => {
     if (isAuthenticated && pendingPath) {
+      dispatch(authActions.setPendingPath(null));
       navigate(pendingPath);
-      setPendingPath(null);
     }
-  }, [isAuthenticated, pendingPath, navigate]);
+  }, [isAuthenticated, pendingPath, navigate, dispatch]);
 
   // Internal staff landing on "/" → immediately redirect to their workspace
   if (!isLoading && user && STAFF_REDIRECTS[user.role]) {
@@ -240,7 +240,7 @@ const HomePage = () => {
 
   const requireAuth = (path: string) => () => {
     if (isAuthenticated) { navigate(path); return; }
-    setPendingPath(path);
+    dispatch(authActions.setPendingPath(path));
     dispatch(authActions.openAuthModal("login"));
   };
 

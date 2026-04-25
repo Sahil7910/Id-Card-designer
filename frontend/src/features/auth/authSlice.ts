@@ -21,6 +21,7 @@ interface AuthState {
   isLoading: boolean;
   error: string | null;
   authModal: "login" | "signup" | null;
+  pendingPath: string | null;
 }
 
 // ── Thunks ─────────────────────────────────────────────────────────
@@ -73,6 +74,7 @@ const initialState: AuthState = {
   isLoading: true, // assume session may exist; fetchUser resolves this on startup
   error: null,
   authModal: null,
+  pendingPath: null,
 };
 
 const authSlice = createSlice({
@@ -84,6 +86,10 @@ const authSlice = createSlice({
     },
     closeAuthModal(state) {
       state.authModal = null;
+      state.pendingPath = null;
+    },
+    setPendingPath(state, action: { payload: string | null }) {
+      state.pendingPath = action.payload;
     },
   },
   extraReducers: (builder) => {

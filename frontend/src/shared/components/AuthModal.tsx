@@ -91,18 +91,17 @@ function AuthModalInner({ mode, onClose, onSwitch }: { mode: AuthMode; onClose: 
       setSuccess(true);
       setTimeout(() => {
         onClose();
-        // Redirect users based on their role
-        if (mode === "login") {
-          const authUser = store.getState().auth.user;
-          const roleRedirects: Record<string, string> = {
-            ADMIN: "/admin",
-            DESIGN: "/design-queue",
-            PRINTING: "/print-queue",
-            SHIPPING: "/shipping-queue",
-          };
-          const redirect = roleRedirects[authUser?.role ?? ""];
-          if (redirect) navigate(redirect);
-        }
+        const state = store.getState();
+        const authUser = state.auth.user;
+        const pending = state.auth.pendingPath;
+        const roleRedirects: Record<string, string> = {
+          ADMIN: "/admin",
+          DESIGN: "/design-queue",
+          PRINTING: "/print-queue",
+          SHIPPING: "/shipping-queue",
+        };
+        const redirect = roleRedirects[authUser?.role ?? ""] ?? pending ?? "/designer/default";
+        navigate(redirect);
       }, 900);
     } catch (err: unknown) {
       const errAny = err as { message?: string };
