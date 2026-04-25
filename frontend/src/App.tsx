@@ -7,10 +7,8 @@ import { fetchUser } from './features/auth/authSlice'
 
 function AppInner() {
   const dispatch = useAppDispatch();
-  const token = useAppSelector(state => state.auth.token);
-
   useEffect(() => {
-    if (token) dispatch(fetchUser());
+    dispatch(fetchUser());
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (

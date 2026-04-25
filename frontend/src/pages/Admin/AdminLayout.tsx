@@ -1,8 +1,9 @@
 import { NavLink, Outlet } from "react-router-dom";
-import { useSelector, useDispatch } from "react-redux";
+import { useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import type { RootState } from "../../app/store";
-import { authActions, logout } from "../../features/auth/authSlice";
+import { useAppDispatch } from "../../app/hooks";
+import { logout } from "../../features/auth/authSlice";
 
 const NAV_ITEMS = [
   { to: "/admin", label: "Overview", icon: "▤", end: true },
@@ -17,7 +18,7 @@ const sidebarW = 220;
 
 export default function AdminLayout() {
   const user = useSelector((state: RootState) => state.auth.user);
-  const dispatch = useDispatch();
+  const dispatch = useAppDispatch();
   const navigate = useNavigate();
 
   return (
