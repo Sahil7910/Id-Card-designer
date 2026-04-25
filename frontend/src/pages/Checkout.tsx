@@ -139,7 +139,10 @@ export default function Checkout({
       setOrderId(res.order_number);
       setStep("confirmed");
     } catch (err: unknown) {
-      const detail = (err as { detail?: string })?.detail ?? "Failed to place order. Please try again.";
+      const status = (err as { status?: number })?.status;
+      const detail = status === 401
+        ? "You must be signed in to place an order. Please log in and try again."
+        : ((err as { detail?: string })?.detail ?? "Failed to place order. Please try again.");
       setOrderError(detail);
     } finally {
       setOrderLoading(false);

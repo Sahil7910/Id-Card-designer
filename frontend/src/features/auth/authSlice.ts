@@ -128,7 +128,9 @@ const authSlice = createSlice({
     });
     builder.addCase(fetchUser.rejected, (state) => {
       state.isLoading = false;
-      state.user = null;
+      // Do not clear state.user here. On page reload Redux resets to
+      // initialState (user: null) anyway. Clearing here would race with
+      // an explicit login that fires concurrently with this session-restore call.
     });
 
     // logout
