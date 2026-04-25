@@ -43,6 +43,9 @@ interface Order {
   grand_total: number;
   total_cards: number;
   items: OrderItem[];
+  tracking_number?: string | null;
+  courier_name?: string | null;
+  tracking_url?: string | null;
   created_at: string | null;
   updated_at: string | null;
 }
@@ -198,6 +201,38 @@ function OrderCard({ order, isExpanded, onToggle }: {
               </div>
             </div>
           </div>
+
+          {/* Dispatch / tracking details */}
+          {order.tracking_number && (
+            <div style={{ background: "#13161d", borderRadius: 10, padding: "14px 16px", border: "1px solid #2a2f3e", marginTop: 16 }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: "#475569", letterSpacing: 1, marginBottom: 10 }}>DISPATCH DETAILS</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                {order.courier_name && (
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <span style={{ fontSize: 12, color: "#64748b", minWidth: 100 }}>Courier</span>
+                    <span style={{ fontSize: 12, color: "#e2e8f0", fontWeight: 600 }}>{order.courier_name}</span>
+                  </div>
+                )}
+                <div style={{ display: "flex", gap: 8 }}>
+                  <span style={{ fontSize: 12, color: "#64748b", minWidth: 100 }}>Tracking No.</span>
+                  <span style={{ fontSize: 12, color: "#e2e8f0", fontWeight: 600 }}>{order.tracking_number}</span>
+                </div>
+                {order.tracking_url && (
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <span style={{ fontSize: 12, color: "#64748b", minWidth: 100 }}>Track Shipment</span>
+                    <a
+                      href={order.tracking_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ fontSize: 12, color: "#38bdf8", fontWeight: 600, textDecoration: "underline" }}
+                    >
+                      Track your order →
+                    </a>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Items table */}
           <div style={{ marginTop: 16 }}>

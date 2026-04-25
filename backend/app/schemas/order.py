@@ -71,6 +71,9 @@ class OrderResponse(BaseModel):
     grand_total: float
     total_cards: int
     items: list[OrderItemResponse]
+    tracking_number: str | None = None
+    courier_name: str | None = None
+    tracking_url: str | None = None
     created_at: datetime | None
     updated_at: datetime | None
 
