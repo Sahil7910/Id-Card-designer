@@ -42,8 +42,8 @@ def decode_token(token: str) -> dict | None:
 
 
 def create_reset_token(user_id: str, password_hash: str) -> str:
-    expire = datetime.now(timezone.utc) + timedelta(hours=1)
-    fp = hashlib.md5(password_hash.encode()).hexdigest()[:8]
+    expire = datetime.now(timezone.utc) + timedelta(minutes=30)
+    fp = hashlib.sha256(password_hash.encode()).hexdigest()[:16]
     return jwt.encode(
         {"sub": user_id, "exp": expire, "type": "reset", "fp": fp},
         settings.JWT_SECRET_KEY,

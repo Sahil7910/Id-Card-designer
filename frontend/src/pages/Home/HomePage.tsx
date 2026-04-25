@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate, Link, Navigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { useAppDispatch, useAppSelector } from "../../app/hooks";
-import { authActions, selectIsAuthenticated, selectAuthUser } from "../../features/auth/authSlice";
+import { authActions, logout, selectIsAuthenticated, selectAuthUser } from "../../features/auth/authSlice";
 
 // Canonical redirect destinations for internal staff
 const STAFF_REDIRECTS: Record<string, string> = {
@@ -188,7 +188,7 @@ function Navbar() {
                 Admin
               </Link>
             )}
-            <button onClick={() => dispatch(authActions.logout())}
+            <button onClick={() => dispatch(logout())}
               style={{ padding: "8px 20px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.15)", background: "transparent", color: "#e2e8f0", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "'DM Sans', sans-serif", transition: "all 0.2s" }}
               onMouseEnter={e => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.35)"; e.currentTarget.style.background = "rgba(255,255,255,0.06)"; }}
               onMouseLeave={e => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.15)"; e.currentTarget.style.background = "transparent"; }}>

@@ -1,6 +1,6 @@
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
@@ -33,6 +33,30 @@ async def rate_limit_handler(request: Request, exc: RateLimitExceeded) -> JSONRe
         status_code=429,
         content={"detail": "Too many requests. Please wait and try again."},
     )
+
+
+# ── Security headers ──────────────────────────────────────────────────────────
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next) -> Response:
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    return response
+
+
+# ── CSRF origin check (#5) ────────────────────────────────────────────────────
+# SameSite=Lax cookies already block cross-origin state-changing requests, but
+# this middleware adds a defence-in-depth layer by rejecting requests whose
+# Origin header doesn't match the configured allow-list.
+@app.middleware("http")
+async def csrf_origin_check(request: Request, call_next) -> Response:
+    if request.method not in ("GET", "HEAD", "OPTIONS"):
+        origin = request.headers.get("origin")
+        if origin and origin not in settings.CORS_ORIGINS:
+            return JSONResponse(status_code=403, content={"detail": "Forbidden: origin not allowed"})
+    return await call_next(request)
 
 
 # ── CORS ──────────────────────────────────────────────────────────────────────

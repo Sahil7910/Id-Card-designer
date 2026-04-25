@@ -310,7 +310,7 @@ async def list_all_orders(
     page: int = Query(1, ge=1),
     per_page: int = Query(20, ge=1, le=100),
     status_filter: str | None = Query(None, alias="status"),
-    search: str | None = Query(None),
+    search: str | None = Query(None, max_length=100),
     admin: User = Depends(get_current_admin),
     db: AsyncSession = Depends(get_db),
 ):

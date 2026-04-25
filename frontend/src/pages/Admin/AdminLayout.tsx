@@ -2,7 +2,7 @@ import { NavLink, Outlet } from "react-router-dom";
 import { useSelector, useDispatch } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import type { RootState } from "../../app/store";
-import { authActions } from "../../features/auth/authSlice";
+import { authActions, logout } from "../../features/auth/authSlice";
 
 const NAV_ITEMS = [
   { to: "/admin", label: "Overview", icon: "▤", end: true },
@@ -72,7 +72,7 @@ export default function AdminLayout() {
 
         <div style={{ padding: "16px 20px", borderTop: "1px solid #1e293b", display: "flex", flexDirection: "column", gap: 10 }}>
           <button
-            onClick={() => { dispatch(authActions.logout()); navigate("/login"); }}
+            onClick={() => { dispatch(logout()); navigate("/login"); }}
             style={{ width: "100%", padding: "9px 0", borderRadius: 8, border: "1px solid rgba(224,92,26,0.3)", background: "rgba(224,92,26,0.08)", color: "#e05c1a", fontWeight: 600, fontSize: 13, cursor: "pointer", transition: "all 0.2s" }}
             onMouseEnter={e => { e.currentTarget.style.background = "rgba(224,92,26,0.18)"; }}
             onMouseLeave={e => { e.currentTarget.style.background = "rgba(224,92,26,0.08)"; }}

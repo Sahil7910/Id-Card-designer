@@ -2,7 +2,7 @@ import hashlib
 import secrets
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from app.limiter import limiter
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -12,13 +12,12 @@ from app.database import get_db
 from app.dependencies import get_current_user
 from app.models.user import User
 from app.schemas.auth import (
+    ChangePasswordRequest,
     ForgotPasswordRequest,
     GoogleAuthRequest,
     LoginRequest,
-    RefreshRequest,
     RegisterRequest,
     ResetPasswordRequest,
-    TokenResponse,
     UserResponse,
     UserUpdate,
 )
@@ -36,10 +35,22 @@ from app.services.email_service import send_password_reset_email
 router = APIRouter()
 
 
-@router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
+def _set_auth_cookies(response: Response, access_token: str, refresh_token: str) -> None:
+    response.set_cookie(
+        "access_token", access_token,
+        httponly=True, samesite="lax",
+        max_age=settings.JWT_ACCESS_EXPIRE_MINUTES * 60,
+    )
+    response.set_cookie(
+        "refresh_token", refresh_token,
+        httponly=True, samesite="lax",
+        max_age=settings.JWT_REFRESH_EXPIRE_DAYS * 86400,
+    )
+
+
+@router.post("/register", status_code=status.HTTP_201_CREATED)
 @limiter.limit("3/minute")
-async def register(request: Request, data: RegisterRequest, db: AsyncSession = Depends(get_db)):
-    # Check if email already exists
+async def register(request: Request, response: Response, data: RegisterRequest, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(User).where(User.email == data.email))
     if result.scalar_one_or_none():
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already registered")
@@ -55,15 +66,13 @@ async def register(request: Request, data: RegisterRequest, db: AsyncSession = D
     db.add(user)
     await db.flush()
 
-    return TokenResponse(
-        access_token=create_access_token(user.id),
-        refresh_token=create_refresh_token(user.id),
-    )
+    _set_auth_cookies(response, create_access_token(user.id), create_refresh_token(user.id))
+    return {"ok": True}
 
 
-@router.post("/login", response_model=TokenResponse)
+@router.post("/login")
 @limiter.limit("5/minute")
-async def login(request: Request, data: LoginRequest, db: AsyncSession = Depends(get_db)):
+async def login(request: Request, response: Response, data: LoginRequest, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(User).where(User.email == data.email))
     user = result.scalar_one_or_none()
 
@@ -73,15 +82,17 @@ async def login(request: Request, data: LoginRequest, db: AsyncSession = Depends
     if not user.is_active:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account is disabled")
 
-    return TokenResponse(
-        access_token=create_access_token(user.id),
-        refresh_token=create_refresh_token(user.id),
-    )
+    _set_auth_cookies(response, create_access_token(user.id), create_refresh_token(user.id))
+    return {"ok": True}
 
 
-@router.post("/refresh", response_model=TokenResponse)
-async def refresh(data: RefreshRequest, db: AsyncSession = Depends(get_db)):
-    payload = decode_token(data.refresh_token)
+@router.post("/refresh")
+async def refresh(request: Request, response: Response, db: AsyncSession = Depends(get_db)):
+    refresh_token = request.cookies.get("refresh_token")
+    if not refresh_token:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="No refresh token")
+
+    payload = decode_token(refresh_token)
     if not payload or payload.get("type") != "refresh":
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
 
@@ -92,10 +103,15 @@ async def refresh(data: RefreshRequest, db: AsyncSession = Depends(get_db)):
     if not user or not user.is_active:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
 
-    return TokenResponse(
-        access_token=create_access_token(user.id),
-        refresh_token=create_refresh_token(user.id),
-    )
+    _set_auth_cookies(response, create_access_token(user.id), create_refresh_token(user.id))
+    return {"ok": True}
+
+
+@router.post("/logout")
+async def logout(response: Response):
+    response.delete_cookie("access_token", samesite="lax")
+    response.delete_cookie("refresh_token", samesite="lax")
+    return {"ok": True}
 
 
 @router.get("/me", response_model=UserResponse)
@@ -114,6 +130,19 @@ async def update_me(
         setattr(user, key, value)
     await db.flush()
     return user
+
+
+@router.post("/change-password", status_code=status.HTTP_200_OK)
+async def change_password(
+    data: ChangePasswordRequest,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    if not verify_password(data.current_password, user.password_hash):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Current password is incorrect")
+    user.password_hash = hash_password(data.new_password)
+    await db.flush()
+    return {"message": "Password changed successfully"}
 
 
 @router.post("/forgot-password", status_code=status.HTTP_200_OK)
@@ -142,7 +171,7 @@ async def reset_password(data: ResetPasswordRequest, db: AsyncSession = Depends(
     if not user or not user.is_active:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired reset link.")
 
-    current_fp = hashlib.md5(user.password_hash.encode()).hexdigest()[:8]
+    current_fp = hashlib.sha256(user.password_hash.encode()).hexdigest()[:16]
     if current_fp != fp:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Reset link has already been used.")
 
@@ -151,10 +180,9 @@ async def reset_password(data: ResetPasswordRequest, db: AsyncSession = Depends(
     return {"message": "Password updated successfully. You can now sign in."}
 
 
-@router.post("/google", response_model=TokenResponse)
-@limiter.limit("10/minute")
-async def google_auth(request: Request, data: GoogleAuthRequest, db: AsyncSession = Depends(get_db)):
-    # Verify access token with Google and fetch user info
+@router.post("/google")
+@limiter.limit("5/minute")
+async def google_auth(request: Request, response: Response, data: GoogleAuthRequest, db: AsyncSession = Depends(get_db)):
     async with httpx.AsyncClient() as client:
         resp = await client.get(
             "https://www.googleapis.com/oauth2/v3/userinfo",
@@ -169,7 +197,6 @@ async def google_auth(request: Request, data: GoogleAuthRequest, db: AsyncSessio
     if not google_id or not email:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Google account has no email.")
 
-    # Try to find existing user by google_id first, then by email
     result = await db.execute(select(User).where(User.google_id == google_id))
     user = result.scalar_one_or_none()
 
@@ -178,7 +205,6 @@ async def google_auth(request: Request, data: GoogleAuthRequest, db: AsyncSessio
         user = result.scalar_one_or_none()
 
     if user:
-        # Link google_id to existing email/password account if not already linked
         if not user.google_id:
             user.google_id = google_id
             user.oauth_provider = "google"
@@ -186,7 +212,6 @@ async def google_auth(request: Request, data: GoogleAuthRequest, db: AsyncSessio
         if not user.is_active:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account is disabled.")
     else:
-        # Create new user from Google profile
         name_parts = info.get("name", email.split("@")[0]).split(" ", 1)
         user = User(
             email=email,
@@ -199,7 +224,5 @@ async def google_auth(request: Request, data: GoogleAuthRequest, db: AsyncSessio
         db.add(user)
         await db.flush()
 
-    return TokenResponse(
-        access_token=create_access_token(user.id),
-        refresh_token=create_refresh_token(user.id),
-    )
+    _set_auth_cookies(response, create_access_token(user.id), create_refresh_token(user.id))
+    return {"ok": True}

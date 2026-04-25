@@ -20,7 +20,7 @@ import {
   selectPricingConfig,
 } from "../../features/config/configSlice";
 import { safeSetItem } from "../../shared/utils/storage";
-import { selectIsAuthenticated, selectAuthUser, authActions } from "../../features/auth/authSlice";
+import { selectIsAuthenticated, selectAuthUser, authActions, logout } from "../../features/auth/authSlice";
 import { Btn, Section, FieldRow, RadioGroup, Select } from "../../shared/components";
 import { FIELD_TEMPLATES, FIELD_COLORS } from "../../features/designer/constants";
 import { CardCanvas } from "../../features/designer/components/CardCanvas";
@@ -404,7 +404,7 @@ export default function IDCardDesigner() {
               <span style={{ fontSize: 12, color: "#94a3b8", fontWeight: 600 }}>
                 {authUser.first_name || authUser.email.split("@")[0]}
               </span>
-              <Btn ghost onClick={() => { dispatch(authActions.logout()); navigate("/"); }}>LOGOUT</Btn>
+              <Btn ghost onClick={() => { dispatch(logout()); navigate("/"); }}>LOGOUT</Btn>
             </>
           ) : (
             <Btn ghost onClick={() => dispatch(authActions.openAuthModal("login"))}>SIGN IN</Btn>

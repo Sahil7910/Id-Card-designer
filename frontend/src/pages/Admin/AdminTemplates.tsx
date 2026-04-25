@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useDispatch } from "react-redux";
 import type { AppDispatch } from "../../app/store";
 import { toggleTemplate, deleteTemplate } from "../../features/admin/adminSlice";
-import { api, getToken } from "../../shared/utils/api";
+import { api } from "../../shared/utils/api";
 
 import { API_BASE } from "../../shared/utils/apiBase";
 
@@ -217,10 +217,9 @@ export default function AdminTemplates() {
         if (frontImageFile) {
           const fd = new FormData();
           fd.append("file", frontImageFile);
-          const token = getToken();
           const res = await fetch(`${API_BASE}/api/uploads/image`, {
             method: "POST",
-            headers: token ? { Authorization: `Bearer ${token}` } : {},
+            credentials: "include",
             body: fd,
           });
           if (!res.ok) throw new Error("Front image upload failed.");
@@ -230,10 +229,9 @@ export default function AdminTemplates() {
         if (backImageFile && form.print_side === "Both Sides") {
           const fd = new FormData();
           fd.append("file", backImageFile);
-          const token = getToken();
           const res = await fetch(`${API_BASE}/api/uploads/image`, {
             method: "POST",
-            headers: token ? { Authorization: `Bearer ${token}` } : {},
+            credentials: "include",
             body: fd,
           });
           if (!res.ok) throw new Error("Back image upload failed.");
@@ -266,10 +264,9 @@ export default function AdminTemplates() {
         fd.append("front_image", frontImageFile);
         if (backImageFile) fd.append("back_image", backImageFile);
 
-        const token = getToken();
         const res = await fetch(`${API_BASE}/api/admin/templates/upload`, {
           method: "POST",
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
+          credentials: "include",
           body: fd,
         });
         if (!res.ok) {

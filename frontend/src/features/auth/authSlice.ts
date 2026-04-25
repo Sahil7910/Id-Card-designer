@@ -1,6 +1,6 @@
 import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
 import type { RootState } from "../../app/store";
-import { api, setTokens, clearTokens, getToken } from "../../shared/utils/api";
+import { api } from "../../shared/utils/api";
 
 // ── Types ──────────────────────────────────────────────────────────
 interface UserResponse {
@@ -16,15 +16,8 @@ interface UserResponse {
   created_at: string | null;
 }
 
-interface TokenResponse {
-  access_token: string;
-  refresh_token: string;
-  token_type: string;
-}
-
 interface AuthState {
   user: UserResponse | null;
-  token: string | null;
   isLoading: boolean;
   error: string | null;
   authModal: "login" | "signup" | null;
@@ -34,20 +27,18 @@ interface AuthState {
 export const register = createAsyncThunk(
   "auth/register",
   async (payload: { email: string; password: string; first_name: string; last_name: string }) => {
-    const tokens = await api.post<TokenResponse>("/api/auth/register", payload);
-    setTokens(tokens.access_token, tokens.refresh_token);
+    await api.post("/api/auth/register", payload);
     const user = await api.get<UserResponse>("/api/auth/me");
-    return { token: tokens.access_token, user };
+    return user;
   },
 );
 
 export const login = createAsyncThunk(
   "auth/login",
   async (payload: { email: string; password: string }) => {
-    const tokens = await api.post<TokenResponse>("/api/auth/login", payload);
-    setTokens(tokens.access_token, tokens.refresh_token);
+    await api.post("/api/auth/login", payload);
     const user = await api.get<UserResponse>("/api/auth/me");
-    return { token: tokens.access_token, user };
+    return user;
   },
 );
 
@@ -66,18 +57,20 @@ export const forgotPassword = createAsyncThunk(
 export const googleAuth = createAsyncThunk(
   "auth/googleAuth",
   async (accessToken: string) => {
-    const tokens = await api.post<TokenResponse>("/api/auth/google", { access_token: accessToken });
-    setTokens(tokens.access_token, tokens.refresh_token);
+    await api.post("/api/auth/google", { access_token: accessToken });
     const user = await api.get<UserResponse>("/api/auth/me");
-    return { token: tokens.access_token, user };
+    return user;
   },
 );
+
+export const logout = createAsyncThunk("auth/logout", async () => {
+  await api.post("/api/auth/logout");
+});
 
 // ── Slice ──────────────────────────────────────────────────────────
 const initialState: AuthState = {
   user: null,
-  token: getToken(),
-  isLoading: !!getToken(),
+  isLoading: true, // assume session may exist; fetchUser resolves this on startup
   error: null,
   authModal: null,
 };
@@ -86,12 +79,6 @@ const authSlice = createSlice({
   name: "auth",
   initialState,
   reducers: {
-    logout(state) {
-      state.user = null;
-      state.token = null;
-      state.error = null;
-      clearTokens();
-    },
     openAuthModal(state, action: { payload: "login" | "signup" }) {
       state.authModal = action.payload;
     },
@@ -104,8 +91,7 @@ const authSlice = createSlice({
     builder.addCase(register.pending, (state) => { state.isLoading = true; state.error = null; });
     builder.addCase(register.fulfilled, (state, action) => {
       state.isLoading = false;
-      state.token = action.payload.token;
-      state.user = action.payload.user;
+      state.user = action.payload;
     });
     builder.addCase(register.rejected, (state, action) => {
       state.isLoading = false;
@@ -116,8 +102,7 @@ const authSlice = createSlice({
     builder.addCase(login.pending, (state) => { state.isLoading = true; state.error = null; });
     builder.addCase(login.fulfilled, (state, action) => {
       state.isLoading = false;
-      state.token = action.payload.token;
-      state.user = action.payload.user;
+      state.user = action.payload;
     });
     builder.addCase(login.rejected, (state, action) => {
       state.isLoading = false;
@@ -128,8 +113,7 @@ const authSlice = createSlice({
     builder.addCase(googleAuth.pending, (state) => { state.isLoading = true; state.error = null; });
     builder.addCase(googleAuth.fulfilled, (state, action) => {
       state.isLoading = false;
-      state.token = action.payload.token;
-      state.user = action.payload.user;
+      state.user = action.payload;
     });
     builder.addCase(googleAuth.rejected, (state, action) => {
       state.isLoading = false;
@@ -145,8 +129,17 @@ const authSlice = createSlice({
     builder.addCase(fetchUser.rejected, (state) => {
       state.isLoading = false;
       state.user = null;
-      state.token = null;
-      clearTokens();
+    });
+
+    // logout
+    builder.addCase(logout.fulfilled, (state) => {
+      state.user = null;
+      state.error = null;
+    });
+    builder.addCase(logout.rejected, (state) => {
+      // Clear local state even if the server call fails
+      state.user = null;
+      state.error = null;
     });
   },
 });
@@ -155,6 +148,6 @@ export const authActions = authSlice.actions;
 export default authSlice.reducer;
 
 // ── Selectors ──────────────────────────────────────────────────────
-export const selectIsAuthenticated = (state: RootState) => !!state.auth.token && !!state.auth.user;
+export const selectIsAuthenticated = (state: RootState) => !!state.auth.user;
 export const selectAuthUser = (state: RootState) => state.auth.user;
 export const selectUserRole = (state: RootState) => state.auth.user?.role ?? null;
