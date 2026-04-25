@@ -2,7 +2,7 @@ import { useEffect } from 'react'
 import { BrowserRouter } from 'react-router-dom'
 import AppRoutes from './routes/AppRoutes'
 import { ErrorBoundary, AuthModal } from './shared/components'
-import { useAppDispatch, useAppSelector } from './app/hooks'
+import { useAppDispatch } from './app/hooks'
 import { fetchUser } from './features/auth/authSlice'
 
 function AppInner() {
