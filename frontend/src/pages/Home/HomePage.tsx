@@ -223,15 +223,25 @@ const HomePage = () => {
   const isAuthenticated = useAppSelector(selectIsAuthenticated);
   const user = useAppSelector(selectAuthUser);
   const isLoading = useAppSelector((s) => s.auth.isLoading);
+  const [pendingPath, setPendingPath] = useState<string | null>(null);
+
+  // Once the user becomes authenticated, complete any pending navigation
+  useEffect(() => {
+    if (isAuthenticated && pendingPath) {
+      navigate(pendingPath);
+      setPendingPath(null);
+    }
+  }, [isAuthenticated, pendingPath, navigate]);
 
   // Internal staff landing on "/" → immediately redirect to their workspace
   if (!isLoading && user && STAFF_REDIRECTS[user.role]) {
     return <Navigate to={STAFF_REDIRECTS[user.role]} replace />;
   }
 
-  const requireAuth = (cb: () => void) => () => {
-    if (!isAuthenticated) { dispatch(authActions.openAuthModal("login")); return; }
-    cb();
+  const requireAuth = (path: string) => () => {
+    if (isAuthenticated) { navigate(path); return; }
+    setPendingPath(path);
+    dispatch(authActions.openAuthModal("login"));
   };
 
   return (
@@ -250,7 +260,7 @@ const HomePage = () => {
 
       {/* ── HERO ── */}
       <HeroSection
-        onStartDesigning={requireAuth(() => navigate("/designer/default"))}
+        onStartDesigning={requireAuth("/designer/default")}
         onViewTemplates={() => navigate("/templates")}
       />
 
@@ -332,7 +342,7 @@ const HomePage = () => {
                   </li>
                 ))}
               </ul>
-              <button onClick={requireAuth(() => navigate("/designer/default"))}
+              <button onClick={requireAuth("/designer/default")}
                 style={{ padding: "12px 28px", borderRadius: 10, border: "none", background: "#e05c1a", color: "#fff", fontWeight: 700, fontSize: 14, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", boxShadow: "0 4px 16px rgba(224,92,26,0.35)", transition: "all 0.2s" }}
                 onMouseEnter={e => { e.currentTarget.style.transform = "scale(1.04)"; }}
                 onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; }}>
@@ -390,7 +400,7 @@ const HomePage = () => {
                   </li>
                 ))}
               </ul>
-              <button onClick={requireAuth(() => navigate("/templates"))}
+              <button onClick={requireAuth("/templates")}
                 style={{ padding: "12px 28px", borderRadius: 10, border: "none", background: "#f97316", color: "#fff", fontWeight: 700, fontSize: 14, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", boxShadow: "0 4px 16px rgba(249,115,22,0.35)", transition: "all 0.2s" }}
                 onMouseEnter={e => { e.currentTarget.style.transform = "scale(1.04)"; }}
                 onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; }}>
@@ -460,7 +470,7 @@ const HomePage = () => {
               onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; }}>
               Create Free Account →
             </button>
-            <button onClick={requireAuth(() => navigate("/designer/default"))}
+            <button onClick={requireAuth("/designer/default")}
               style={{ padding: "16px 40px", borderRadius: 12, border: "1px solid rgba(255,255,255,0.14)", background: "transparent", color: "#e2e8f0", fontWeight: 600, fontSize: 16, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", transition: "all 0.2s" }}
               onMouseEnter={e => { e.currentTarget.style.background = "rgba(255,255,255,0.06)"; }}
               onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}>
