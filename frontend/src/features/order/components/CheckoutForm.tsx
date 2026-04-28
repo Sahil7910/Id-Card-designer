@@ -139,30 +139,24 @@ export function CheckoutForm({
     setStateOptions(getStates(country));
     setDistrictOptions([]);
     setCityOptions([]);
-    touch("country");
+    // Touch is intentionally NOT called here — onBlur handles it so that
+    // errors only appear after the parent has committed the new value.
   }
 
   function handleStateChange(state: string) {
     onChange({ ...values, state, district: "", city: "", zip: "" });
     setDistrictOptions(getDistricts(values.country, state));
     setCityOptions([]);
-    touch("state");
   }
 
   function handleDistrictChange(district: string) {
     onChange({ ...values, district, city: "", zip: "" });
     setCityOptions(getCities(values.country, values.state, district));
-    touch("district");
   }
 
   function handleCityChange(city: string) {
     const zip = getPincode(values.country, values.state, values.district, city);
     onChange({ ...values, city, zip });
-    touch("city");
-  }
-
-  function touch(field: string) {
-    setTouched(t => ({ ...t, [field]: true }));
   }
 
   function handleBlur(field: string) {
