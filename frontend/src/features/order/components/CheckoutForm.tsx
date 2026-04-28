@@ -107,13 +107,16 @@ export function CheckoutForm({
   onChange,
   onValidityChange,
 }: CheckoutFormProps) {
-  const [errors,          setErrors]          = useState<Record<string, string>>({});
   const [touched,         setTouched]         = useState<Record<string, boolean>>({});
   const [stateOptions,    setStateOptions]    = useState<string[]>([]);
   const [districtOptions, setDistrictOptions] = useState<string[]>([]);
   const [cityOptions,     setCityOptions]     = useState<CityData[]>([]);
 
   const isIndia = values.country === "India";
+
+  // Always derived from the current values prop — eliminates stale-closure
+  // errors that appear on State / District / City selects after selection.
+  const errors = validate(values);
 
   // Initialise dropdown option lists from existing values (e.g. back-navigation)
   useEffect(() => {
@@ -164,7 +167,6 @@ export function CheckoutForm({
 
   function handleBlur(field: string) {
     setTouched(t => ({ ...t, [field]: true }));
-    setErrors(validate(values));
   }
 
   function handleTextChange(field: keyof AddressForm, value: string) {

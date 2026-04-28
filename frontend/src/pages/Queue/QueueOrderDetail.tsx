@@ -47,6 +47,10 @@ export default function QueueOrderDetail({
   const uploadLoading = useSelector(selectWorkflowUploadLoading);
   const trackingLoading = useSelector(selectWorkflowTrackingLoading);
 
+  // Design preview modal
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewName, setPreviewName] = useState<string>("");
+
   // Status update state
   const [newStatus, setNewStatus] = useState<string>("");
   const [statusNote, setStatusNote] = useState<string>("");
@@ -307,35 +311,89 @@ export default function QueueOrderDetail({
       {order.items.some(item => item.thumbnail_url) && (
         <Panel title="Customer Design Files" style={{ marginBottom: 24 }}>
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {order.items.filter(item => item.thumbnail_url).map((item, idx) => (
-              <div key={item.id} style={{ display: "flex", alignItems: "center", gap: 14, padding: 12, background: "#0b0f1a", borderRadius: 8 }}>
-                <img
-                  src={`${API_BASE}${item.thumbnail_url}`}
-                  alt={`Design ${idx + 1}`}
-                  style={{ width: 80, height: 50, objectFit: "cover", borderRadius: 6, border: "1px solid #1e293b", background: "#141824" }}
-                  onError={e => { (e.target as HTMLImageElement).style.display = "none"; }}
-                />
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 13, color: "#e2e8f0", fontWeight: 600 }}>
-                    {item.card_type} × {item.quantity}
+            {order.items.filter(item => item.thumbnail_url).map((item, idx) => {
+              const fullUrl = `${API_BASE}${item.thumbnail_url}`;
+              const label = `${item.card_type}-design-${idx + 1}.png`;
+              return (
+                <div key={item.id} style={{ display: "flex", alignItems: "center", gap: 14, padding: 12, background: "#0b0f1a", borderRadius: 8 }}>
+                  <img
+                    src={fullUrl}
+                    alt={`Design ${idx + 1}`}
+                    onClick={() => { setPreviewUrl(fullUrl); setPreviewName(label); }}
+                    style={{ width: 80, height: 50, objectFit: "cover", borderRadius: 6, border: "1px solid #1e293b", background: "#141824", cursor: "pointer", transition: "opacity 0.15s" }}
+                    onMouseEnter={e => (e.currentTarget.style.opacity = "0.75")}
+                    onMouseLeave={e => (e.currentTarget.style.opacity = "1")}
+                    onError={e => { (e.target as HTMLImageElement).style.display = "none"; }}
+                  />
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 13, color: "#e2e8f0", fontWeight: 600 }}>
+                      {item.card_type} × {item.quantity}
+                    </div>
+                    <div style={{ fontSize: 11, color: "#64748b", marginTop: 2 }}>
+                      {item.printer} • {item.print_side} • {item.orientation} • {item.finish}
+                    </div>
                   </div>
-                  <div style={{ fontSize: 11, color: "#64748b", marginTop: 2 }}>
-                    {item.printer} • {item.print_side} • {item.orientation} • {item.finish}
-                  </div>
+                  <button
+                    onClick={() => { setPreviewUrl(fullUrl); setPreviewName(label); }}
+                    style={{ padding: "6px 14px", background: "#1e293b", color: "#94a3b8", borderRadius: 6, fontSize: 12, fontWeight: 600, border: "none", cursor: "pointer", whiteSpace: "nowrap" }}
+                  >
+                    🔍 Preview
+                  </button>
                 </div>
-                <a
-                  href={`${API_BASE}${item.thumbnail_url}`}
-                  download={`design-${idx + 1}.png`}
-                  target="_blank"
-                  rel="noreferrer"
-                  style={{ padding: "6px 14px", background: "#1e293b", color: "#94a3b8", borderRadius: 6, fontSize: 12, fontWeight: 600, textDecoration: "none", whiteSpace: "nowrap" }}
-                >
-                  ⬇ Download Preview
-                </a>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </Panel>
+      )}
+
+      {/* ── Design preview modal ── */}
+      {previewUrl && (
+        <div
+          onClick={() => setPreviewUrl(null)}
+          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 24, backdropFilter: "blur(6px)" }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{ position: "relative", background: "#0f1623", border: "1px solid #1e293b", borderRadius: 16, padding: 24, maxWidth: "90vw", maxHeight: "90vh", display: "flex", flexDirection: "column", gap: 16, boxShadow: "0 32px 80px rgba(0,0,0,0.8)" }}
+          >
+            {/* Header */}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 24 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: "#94a3b8" }}>Design Preview</div>
+              <button
+                onClick={() => setPreviewUrl(null)}
+                style={{ background: "rgba(255,255,255,0.06)", border: "none", color: "#64748b", borderRadius: 8, width: 32, height: 32, cursor: "pointer", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center" }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Image */}
+            <img
+              src={previewUrl}
+              alt="Design preview"
+              style={{ maxWidth: "80vw", maxHeight: "65vh", objectFit: "contain", borderRadius: 10, border: "1px solid #1e293b", display: "block" }}
+            />
+
+            {/* Actions */}
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+              <button
+                onClick={() => setPreviewUrl(null)}
+                style={{ padding: "8px 20px", background: "#1e293b", color: "#94a3b8", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}
+              >
+                Close
+              </button>
+              <a
+                href={previewUrl}
+                download={previewName}
+                target="_blank"
+                rel="noreferrer"
+                style={{ padding: "8px 20px", background: "#e05c1a", color: "#fff", borderRadius: 8, fontSize: 13, fontWeight: 600, textDecoration: "none", display: "flex", alignItems: "center", gap: 6 }}
+              >
+                ⬇ Download
+              </a>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Attachments */}
