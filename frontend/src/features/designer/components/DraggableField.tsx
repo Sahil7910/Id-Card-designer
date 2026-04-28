@@ -57,9 +57,9 @@ export function DraggableField({ field, isSelected, onMouseDown, onResizeDown, i
         userSelect: "none", minWidth: 20, minHeight: 10,
       }}
     >
-      {/* Selection handles */}
+      {/* Selection handles — excluded from html2canvas thumbnail capture */}
       {isSelected && isEditable && (
-        <>
+        <div data-html2canvas-ignore="true">
           <div data-selected-border="1" style={{ position: "absolute", inset: -4, border: `2px dashed ${color}`, borderRadius: 5, pointerEvents: "none", zIndex: 20 }} />
           <div style={{ position: "absolute", top: -20, left: 0, background: color, borderRadius: "3px 3px 0 0", padding: "1px 7px", fontSize: 9, fontWeight: 700, color: "#fff", letterSpacing: 0.5, whiteSpace: "nowrap", zIndex: 22 }}>
             {field.label.length > 14 ? field.label.slice(0, 13) + "…" : field.label}
@@ -69,7 +69,7 @@ export function DraggableField({ field, isSelected, onMouseDown, onResizeDown, i
               onMouseDown={e => { e.stopPropagation(); onResizeDown(e, field.id, h.id); }}
               style={{ position: "absolute", width: 10, height: 10, background: "#fff", border: `2px solid ${color}`, borderRadius: 2, cursor: h.cursor, zIndex: 25, ...h.style }} />
           ))}
-        </>
+        </div>
       )}
 
       {/* ── Photo ── */}

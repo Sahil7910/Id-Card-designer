@@ -51,6 +51,7 @@ export function CardCanvas({
             <img src={fullBgUrl} alt="" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", pointerEvents: "none" }} />
             {isEditing && onRemoveBackground && (
               <button
+                data-html2canvas-ignore="true"
                 onClick={e => { e.stopPropagation(); onRemoveBackground(); }}
                 style={{ position: "absolute", top: 8, right: 8, zIndex: 30, width: 24, height: 24, borderRadius: 6, background: "#ef444499", border: "none", color: "#fff", cursor: "pointer", fontSize: 13, display: "flex", alignItems: "center", justifyContent: "center" }}
                 title="Remove background">
@@ -65,6 +66,7 @@ export function CardCanvas({
         {/* Empty state: clickable upload zone when no background and no fields */}
         {fields.length === 0 && !bgSvg && !fullBgUrl && isEditing && onTemplateUpload && (
           <div
+            data-html2canvas-ignore="true"
             onClick={e => { e.stopPropagation(); fileInputRef.current?.click(); }}
             style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 10, pointerEvents: "auto", cursor: "pointer" }}>
             <div style={{ width: 52, height: 52, borderRadius: 12, border: `2px dashed ${accent}88`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, color: accent, opacity: 0.7 }}>⬆</div>

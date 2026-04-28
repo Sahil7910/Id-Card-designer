@@ -236,11 +236,11 @@ export default function IDCardDesigner() {
           const savedId = designId;
           html2canvas(frontCardRef.current, {
             backgroundColor: null,
-            scale: 1,
+            scale: 3,
             useCORS: true,
             logging: false,
           }).then(canvas => {
-            return new Promise<Blob | null>(resolve => canvas.toBlob(resolve, "image/png"));
+            return new Promise<Blob | null>(resolve => canvas.toBlob(resolve, "image/png", 1.0));
           }).then(async (blob) => {
             if (!blob) return;
             const fd = new FormData();
