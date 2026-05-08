@@ -22,7 +22,7 @@ import {
 import { safeSetItem } from "../../shared/utils/storage";
 import { selectIsAuthenticated, selectAuthUser, authActions, logout } from "../../features/auth/authSlice";
 import { Btn, Section, FieldRow, RadioGroup, Select } from "../../shared/components";
-import { FIELD_TEMPLATES, FIELD_COLORS } from "../../features/designer/constants";
+import { FIELD_TEMPLATES, FIELD_COLORS, FIELD_SIZE_STANDARDS, getFieldSizeWarnings } from "../../features/designer/constants";
 import { CardCanvas } from "../../features/designer/components/CardCanvas";
 import { PreviewField } from "../../features/designer/components/PreviewField";
 import { FontPicker } from "../../features/designer/components/FontPicker";
@@ -404,6 +404,15 @@ export default function IDCardDesigner() {
               <span style={{ fontSize: 12, color: "#94a3b8", fontWeight: 600 }}>
                 {authUser.first_name || authUser.email.split("@")[0]}
               </span>
+              {authUser.role === "CUSTOMER" && (
+                <button
+                  onClick={() => navigate("/orders")}
+                  style={{ background: "#1e2330", border: "1px solid #3a3f52", color: "#94a3b8", borderRadius: 6, padding: "7px 14px", cursor: "pointer", fontSize: 12, fontWeight: 600, display: "flex", alignItems: "center", gap: 6, transition: "all 0.15s" }}
+                  onMouseEnter={e => { e.currentTarget.style.borderColor = "#e05c1a55"; e.currentTarget.style.color = "#e05c1a"; }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor = "#3a3f52"; e.currentTarget.style.color = "#94a3b8"; }}>
+                  📋 MY ORDERS
+                </button>
+              )}
               <Btn ghost onClick={() => { dispatch(logout()); navigate("/"); }}>LOGOUT</Btn>
             </>
           ) : (
@@ -556,10 +565,81 @@ export default function IDCardDesigner() {
                 </div>
               )}
 
+              {/* ── Design Warnings Summary ── */}
+              {activeTab === "CONTENT" && (() => {
+                const allWarnings = fields.flatMap(f => {
+                  const ws = getFieldSizeWarnings(f);
+                  return ws.map(w => ({ field: f, warning: w }));
+                });
+                if (allWarnings.length === 0) return null;
+                return (
+                  <div style={{ background: "#1e2330", border: "1px solid #f59e0b44", borderRadius: 10, padding: 12 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 9 }}>
+                      <span style={{ fontSize: 13 }}>⚠️</span>
+                      <span style={{ fontSize: 10, fontWeight: 700, color: "#f59e0b", letterSpacing: 1.5 }}>DESIGN WARNINGS ({allWarnings.length})</span>
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+                      {allWarnings.map(({ field: f, warning: w }, i) => (
+                        <button key={i} onClick={() => dispatch(designerActions.selectField(f.id))}
+                          style={{ display: "flex", alignItems: "flex-start", gap: 8, background: selectedFieldId === f.id ? "#f59e0b12" : "#13161d", border: `1px solid ${w.severity === "error" ? "#ef444433" : "#f59e0b33"}`, borderRadius: 6, padding: "6px 9px", cursor: "pointer", textAlign: "left", width: "100%" }}
+                          onMouseEnter={e => { e.currentTarget.style.background = "#f59e0b18"; }}
+                          onMouseLeave={e => { e.currentTarget.style.background = selectedFieldId === f.id ? "#f59e0b12" : "#13161d"; }}>
+                          <span style={{ fontSize: 10, flexShrink: 0, marginTop: 2, color: w.severity === "error" ? "#ef4444" : "#f59e0b" }}>{w.severity === "error" ? "✕" : "!"}</span>
+                          <div>
+                            <div style={{ fontSize: 10, fontWeight: 600, color: "#94a3b8", marginBottom: 1 }}>{f.label}</div>
+                            <div style={{ fontSize: 9, color: w.severity === "error" ? "#ef4444cc" : "#f59e0bcc", lineHeight: 1.4 }}>{w.message}</div>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                    <div style={{ fontSize: 9, color: "#475569", marginTop: 8, paddingTop: 7, borderTop: "1px solid #2a2f3e" }}>
+                      Click a warning to select the field and fix it.
+                    </div>
+                  </div>
+                );
+              })()}
+
               {/* Field Properties */}
               {activeTab === "CONTENT" && selectedField && (
                 <div style={{ background: "#1e2330", border: "1px solid #e05c1a33", borderRadius: 10, padding: 12 }}>
                   <div style={{ fontSize: 10, fontWeight: 700, color: "#e05c1a", letterSpacing: 1.5, marginBottom: 10 }}>FIELD PROPERTIES</div>
+
+                  {/* ── Size validation warnings ── */}
+                  {(() => {
+                    const warnings = getFieldSizeWarnings(selectedField);
+                    const std = FIELD_SIZE_STANDARDS[selectedField.type];
+                    if (warnings.length === 0) return (
+                      <div style={{ display: "flex", alignItems: "center", gap: 7, background: "#14532d18", border: "1px solid #16a34a44", borderRadius: 7, padding: "7px 10px", marginBottom: 12 }}>
+                        <span style={{ fontSize: 14, flexShrink: 0 }}>✓</span>
+                        <div>
+                          <div style={{ fontSize: 10, fontWeight: 700, color: "#16a34a", lineHeight: 1.3 }}>Size meets design standards</div>
+                          <div style={{ fontSize: 9, color: "#4ade8066", marginTop: 1 }}>Recommended: {std.recommended}</div>
+                        </div>
+                      </div>
+                    );
+                    return (
+                      <div style={{ background: "#2d1f0e18", border: "1px solid #f59e0b44", borderRadius: 8, padding: "9px 11px", marginBottom: 12 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
+                          <span style={{ fontSize: 14, flexShrink: 0 }}>⚠️</span>
+                          <span style={{ fontSize: 10, fontWeight: 700, color: "#f59e0b", letterSpacing: 0.5 }}>SIZE STANDARDS ISSUE</span>
+                        </div>
+                        <div style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: 7 }}>
+                          {warnings.map((w, i) => (
+                            <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 6, background: w.severity === "error" ? "#ef444418" : "#f59e0b12", border: `1px solid ${w.severity === "error" ? "#ef444444" : "#f59e0b33"}`, borderRadius: 5, padding: "5px 8px" }}>
+                              <span style={{ fontSize: 11, flexShrink: 0, marginTop: 1 }}>{w.severity === "error" ? "✕" : "!"}</span>
+                              <span style={{ fontSize: 10, color: w.severity === "error" ? "#ef4444" : "#f59e0b", lineHeight: 1.4 }}>{w.message}</span>
+                            </div>
+                          ))}
+                        </div>
+                        <div style={{ fontSize: 9, color: "#64748b", borderTop: "1px solid #2a2f3e", paddingTop: 6 }}>
+                          <span style={{ color: "#475569", fontWeight: 600 }}>Recommended: </span>{std.recommended}
+                          {std.tips.map((tip, i) => (
+                            <div key={i} style={{ marginTop: 2, paddingLeft: 6, borderLeft: "2px solid #2a2f3e", color: "#475569" }}>→ {tip}</div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })()}
 
                   {/* Field label rename */}
                   <div style={{ marginBottom: 12 }}>
@@ -1298,7 +1378,7 @@ export default function IDCardDesigner() {
                   <div style={{ textAlign: "center", padding: "20px 0" }}>
                     <div style={{ fontSize: 40, marginBottom: 10 }}>✅</div>
                     <div style={{ fontSize: 14, fontWeight: 700, color: "#22c55e" }}>Template saved!</div>
-                    <div style={{ fontSize: 12, color: "#64748b", marginTop: 6 }}>Find it in your "My Templates" tab on the Templates page</div>
+                    <div style={{ fontSize: 12, color: "#64748b", marginTop: 6 }}>Find it in your "Add Template" tab on the Templates page</div>
                   </div>
                 ) : (
                   <>

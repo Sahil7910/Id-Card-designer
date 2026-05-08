@@ -166,7 +166,7 @@ export default function TemplatePage({ isHorizontal: _isHorizontal, onApply, onC
 
       {/* Tab strip */}
       <div style={{ padding: "0 28px", borderBottom: "1px solid #2a2f3e", display: "flex", gap: 0, flexShrink: 0 }}>
-        {([["system", "🗂 All Templates"], ["mine", "👤 My Templates"]] as const).map(([tab, label]) => {
+        {([["system", "🗂 All Templates"], ["mine", "+ Add Template"]] as const).map(([tab, label]) => {
           const isActive = activeTab === tab;
           return (
             <button
@@ -262,7 +262,7 @@ export default function TemplatePage({ isHorizontal: _isHorizontal, onApply, onC
               <div>
                 <div style={{ fontSize: 14, fontWeight: 700, color: "#f1f5f9" }}>{previewTpl.name}</div>
                 <div style={{ fontSize: 11, color: "#64748b", marginTop: 2 }}>
-                  {activeTab === "mine" ? "My Template" : previewTpl.category} {"\u00B7"} {previewTpl.backFields.length > 0 ? "Front + Back" : "Front only"}
+                  {activeTab === "mine" ? "Add Template" : previewTpl.category} {"\u00B7"} {previewTpl.backFields.length > 0 ? "Front + Back" : "Front only"}
                 </div>
               </div>
               <button onClick={() => setPreviewId(null)} style={{ background: "none", border: "none", color: "#475569", cursor: "pointer", fontSize: 16, lineHeight: 1 }}>{"\u2715"}</button>
@@ -368,7 +368,7 @@ function TemplateCard({ tpl, isHovered, isPreviewing, onHover, onPreview, onAppl
           <div style={{ fontSize: 13, fontWeight: 700, color: "#e2e8f0" }}>{tpl.name}</div>
           <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 3 }}>
             {!canDelete && <span style={{ fontSize: 10, padding: "1px 7px", borderRadius: 8, background: tpl.accent + "22", border: `1px solid ${tpl.accent}44`, color: tpl.accent, fontWeight: 600 }}>{tpl.category}</span>}
-            {canDelete && <span style={{ fontSize: 10, padding: "1px 7px", borderRadius: 8, background: "#a855f722", border: "1px solid #a855f744", color: "#a855f7", fontWeight: 600 }}>My Template</span>}
+            {canDelete && <span style={{ fontSize: 10, padding: "1px 7px", borderRadius: 8, background: "#a855f722", border: "1px solid #a855f744", color: "#a855f7", fontWeight: 600 }}>Add Template</span>}
             <span style={{ fontSize: 10, color: "#475569" }}>{tpl.orientation ?? "Horizontal"} · {(tpl.backFields.length > 0 || !!tpl.backBgUrl) ? "Front + Back" : "Front only"}</span>
           </div>
         </div>
