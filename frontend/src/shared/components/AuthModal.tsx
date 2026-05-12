@@ -3,8 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { store } from "../../app/store";
 import { useAppDispatch, useAppSelector } from "../../app/hooks";
-// import { useGoogleLogin } from "@react-oauth/google";  // TODO: Phase 2 — Google OAuth
-import { login, register, forgotPassword, authActions } from "../../features/auth/authSlice";
+import { useGoogleLogin } from "@react-oauth/google";
+import { login, register, forgotPassword, googleAuth, authActions } from "../../features/auth/authSlice";
 
 type AuthMode = "login" | "signup";
 interface AuthForm { name: string; email: string; password: string; confirm: string }
@@ -45,8 +45,35 @@ function AuthModalInner({ mode, onClose, onSwitch }: { mode: AuthMode; onClose: 
   const [success, setSuccess] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // TODO: Phase 2 — Google OAuth (enable after adding authorized origins in Google Cloud Console)
-  // const handleGoogleLogin = useGoogleLogin({ ... });
+  const handleGoogleLogin = useGoogleLogin({
+    onSuccess: async ({ access_token }) => {
+      setLoading(true);
+      setError("");
+      try {
+        await dispatch(googleAuth(access_token)).unwrap();
+        setSuccess(true);
+        setTimeout(() => {
+          onClose();
+          const state = store.getState();
+          const authUser = state.auth.user;
+          const pending = state.auth.pendingPath;
+          const roleRedirects: Record<string, string> = {
+            ADMIN: "/admin",
+            DESIGN: "/design-queue",
+            PRINTING: "/print-queue",
+            SHIPPING: "/shipping-queue",
+          };
+          navigate(roleRedirects[authUser?.role ?? ""] ?? pending ?? "/designer/default");
+        }, 900);
+      } catch (err: unknown) {
+        const errAny = err as { message?: string };
+        setError(errAny?.message ?? "Google sign-in failed. Please try again.");
+      } finally {
+        setLoading(false);
+      }
+    },
+    onError: () => setError("Google sign-in was cancelled or failed."),
+  });
 
   // Forgot password local state
   const [view, setView] = useState<"auth" | "forgot" | "forgot-sent">("auth");
@@ -205,16 +232,19 @@ function AuthModalInner({ mode, onClose, onSwitch }: { mode: AuthMode; onClose: 
             </div>
           ) : (
             <>
-              {/* TODO: Phase 2 — re-enable Google/LinkedIn OAuth after configuring Google Cloud Console */}
               <div style={{ display: "flex", gap: 10, marginBottom: 22 }}>
-                {[{ icon: "G", label: "Google", bg: "#4285f4" }, { icon: "in", label: "LinkedIn", bg: "#0a66c2" }].map(btn => (
-                  <button key={btn.label} disabled
-                    title="Coming soon"
-                    style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "10px 14px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.04)", color: "#e2e8f0", cursor: "not-allowed", fontSize: 13, fontWeight: 600, opacity: 0.4 }}>
-                    <span style={{ width: 20, height: 20, borderRadius: 5, background: btn.bg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 900, color: "#fff" }}>{btn.icon}</span>
-                    {btn.label}
-                  </button>
-                ))}
+                <button
+                  onClick={() => handleGoogleLogin()}
+                  disabled={loading}
+                  style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "10px 14px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.04)", color: "#e2e8f0", cursor: loading ? "not-allowed" : "pointer", fontSize: 13, fontWeight: 600, opacity: loading ? 0.4 : 1, transition: "opacity 0.2s" }}>
+                  <span style={{ width: 20, height: 20, borderRadius: 5, background: "#4285f4", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 900, color: "#fff" }}>G</span>
+                  Google
+                </button>
+                <button disabled title="Coming soon"
+                  style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "10px 14px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.04)", color: "#e2e8f0", cursor: "not-allowed", fontSize: 13, fontWeight: 600, opacity: 0.4 }}>
+                  <span style={{ width: 20, height: 20, borderRadius: 5, background: "#0a66c2", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 900, color: "#fff" }}>in</span>
+                  LinkedIn
+                </button>
               </div>
 
               <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 22 }}>
