@@ -3,7 +3,7 @@ import { useNavigate, Link } from "react-router-dom";
 import { useGoogleLogin } from "@react-oauth/google";
 import { store } from "../../app/store";
 import { useAppDispatch, useAppSelector } from "../../app/hooks";
-import { login, forgotPassword, googleAuth } from "../../features/auth/authSlice";
+import { login, forgotPassword, googleAuth, authActions } from "../../features/auth/authSlice";
 
 const ROLE_REDIRECTS: Record<string, string> = {
   ADMIN: "/admin",
@@ -201,9 +201,11 @@ export default function LoginPage() {
                   <strong style={{ color: "#e2e8f0" }}>{forgotEmail}</strong>.<br />
                   Would you like to create one?
                 </div>
-                <Link to="/" style={{ display: "block", width: "100%", padding: "13px 0", borderRadius: 10, border: "none", background: "linear-gradient(135deg, #e05c1a, #f97316)", color: "#fff", fontWeight: 700, fontSize: 15, cursor: "pointer", marginBottom: 12, textDecoration: "none", textAlign: "center" }}>
+                <button
+                  onClick={() => { navigate("/"); dispatch(authActions.openAuthModal("signup")); }}
+                  style={{ width: "100%", padding: "13px 0", borderRadius: 10, border: "none", background: "linear-gradient(135deg, #e05c1a, #f97316)", color: "#fff", fontWeight: 700, fontSize: 15, cursor: "pointer", marginBottom: 12 }}>
                   Create Account →
-                </Link>
+                </button>
                 <button onClick={() => setView("forgot")} style={{ background: "none", border: "1px solid rgba(255,255,255,0.12)", color: "#e2e8f0", borderRadius: 10, padding: "11px 28px", cursor: "pointer", fontSize: 13, fontWeight: 600 }}>
                   Try another email
                 </button>
