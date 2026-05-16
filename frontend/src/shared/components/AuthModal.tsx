@@ -76,7 +76,7 @@ function AuthModalInner({ mode, onClose, onSwitch }: { mode: AuthMode; onClose: 
   });
 
   // Forgot password local state
-  const [view, setView] = useState<"auth" | "forgot" | "forgot-sent">("auth");
+  const [view, setView] = useState<"auth" | "forgot" | "forgot-sent" | "forgot-google" | "forgot-not-found">("auth");
   const [forgotEmail, setForgotEmail] = useState("");
   const [forgotLoading, setForgotLoading] = useState(false);
   const [forgotError, setForgotError] = useState("");
@@ -184,8 +184,14 @@ function AuthModalInner({ mode, onClose, onSwitch }: { mode: AuthMode; onClose: 
                   if (!forgotEmail.includes("@")) return setForgotError("Enter a valid email address.");
                   setForgotLoading(true);
                   try {
-                    await dispatch(forgotPassword(forgotEmail)).unwrap();
-                    setView("forgot-sent");
+                    const res = await dispatch(forgotPassword(forgotEmail)).unwrap();
+                    if (!res?.exists) {
+                      setView("forgot-not-found");
+                    } else if (res?.oauth) {
+                      setView("forgot-google");
+                    } else {
+                      setView("forgot-sent");
+                    }
                   } catch {
                     setForgotError("Something went wrong. Please try again.");
                   } finally {
@@ -207,6 +213,47 @@ function AuthModalInner({ mode, onClose, onSwitch }: { mode: AuthMode; onClose: 
                 We sent a reset link to <strong style={{ color: "#e2e8f0" }}>{forgotEmail}</strong>.<br />
                 The link expires in 1 hour.
               </div>
+              <button onClick={() => setView("auth")} style={{ background: "none", border: "1px solid rgba(255,255,255,0.12)", color: "#e2e8f0", borderRadius: 10, padding: "11px 28px", cursor: "pointer", fontSize: 13, fontWeight: 600 }}>
+                Back to Sign In
+              </button>
+            </div>
+          )}
+
+          {/* ── Account not found ── */}
+          {view === "forgot-not-found" && (
+            <div style={{ textAlign: "center", padding: "12px 0 8px" }}>
+              <div style={{ width: 64, height: 64, borderRadius: "50%", background: "#7f1d1d22", border: "2px solid #ef4444", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px", fontSize: 28 }}>✕</div>
+              <div style={{ fontSize: 20, fontWeight: 700, color: "#e2e8f0", marginBottom: 10 }}>No account found</div>
+              <div style={{ fontSize: 13, color: "#64748b", lineHeight: 1.7, marginBottom: 28 }}>
+                There's no account registered with<br />
+                <strong style={{ color: "#e2e8f0" }}>{forgotEmail}</strong>.<br />
+                Would you like to create one?
+              </div>
+              <button onClick={() => { setView("auth"); onSwitch("signup"); }}
+                style={{ width: "100%", padding: "13px 0", borderRadius: 10, border: "none", background: "linear-gradient(135deg, #e05c1a, #f97316)", color: "#fff", fontWeight: 700, fontSize: 15, cursor: "pointer", marginBottom: 12 }}>
+                Create Account →
+              </button>
+              <button onClick={() => setView("forgot")} style={{ background: "none", border: "1px solid rgba(255,255,255,0.12)", color: "#e2e8f0", borderRadius: 10, padding: "11px 28px", cursor: "pointer", fontSize: 13, fontWeight: 600 }}>
+                Try another email
+              </button>
+            </div>
+          )}
+
+          {/* ── Google account — no password reset ── */}
+          {view === "forgot-google" && (
+            <div style={{ textAlign: "center", padding: "12px 0 8px" }}>
+              <div style={{ width: 64, height: 64, borderRadius: "50%", background: "#4285f422", border: "2px solid #4285f4", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px", fontSize: 28 }}>G</div>
+              <div style={{ fontSize: 20, fontWeight: 700, color: "#e2e8f0", marginBottom: 10 }}>Google account detected</div>
+              <div style={{ fontSize: 13, color: "#64748b", lineHeight: 1.7, marginBottom: 28 }}>
+                This email is linked to a Google account.<br />
+                You don't need a password — just sign in with Google.
+              </div>
+              <button
+                onClick={() => { handleGoogleLogin(); setView("auth"); }}
+                style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 10, padding: "13px 0", borderRadius: 10, border: "none", background: "#4285f4", color: "#fff", fontWeight: 700, fontSize: 15, cursor: "pointer", marginBottom: 12 }}>
+                <span style={{ width: 22, height: 22, borderRadius: 4, background: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 900, color: "#4285f4" }}>G</span>
+                Continue with Google
+              </button>
               <button onClick={() => setView("auth")} style={{ background: "none", border: "1px solid rgba(255,255,255,0.12)", color: "#e2e8f0", borderRadius: 10, padding: "11px 28px", cursor: "pointer", fontSize: 13, fontWeight: 600 }}>
                 Back to Sign In
               </button>

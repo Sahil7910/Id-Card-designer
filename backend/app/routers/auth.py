@@ -151,12 +151,14 @@ async def forgot_password(request: Request, data: ForgotPasswordRequest, db: Asy
     result = await db.execute(select(User).where(User.email == data.email))
     user = result.scalar_one_or_none()
     if user and user.is_active:
+        if user.oauth_provider == "google":
+            return {"exists": True, "oauth": True, "provider": "google"}
         token = create_reset_token(user.id, user.password_hash)
         reset_link = f"{settings.FRONTEND_URL}/reset-password?token={token}"
         name = user.first_name or user.email
         await send_password_reset_email(user.email, name, reset_link)
-    # Always return 200 to prevent email enumeration
-    return {"message": "If that email is registered, a reset link has been sent."}
+        return {"exists": True, "oauth": False}
+    return {"exists": False, "oauth": False}
 
 
 @router.post("/reset-password", status_code=status.HTTP_200_OK)

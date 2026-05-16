@@ -51,7 +51,8 @@ export const fetchUser = createAsyncThunk("auth/fetchUser", async () => {
 export const forgotPassword = createAsyncThunk(
   "auth/forgotPassword",
   async (email: string) => {
-    await api.post("/api/auth/forgot-password", { email });
+    const res = await api.post<{ exists: boolean; oauth: boolean; provider?: string }>("/api/auth/forgot-password", { email });
+    return res;
   },
 );
 
