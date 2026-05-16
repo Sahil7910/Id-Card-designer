@@ -232,18 +232,13 @@ function AuthModalInner({ mode, onClose, onSwitch }: { mode: AuthMode; onClose: 
             </div>
           ) : (
             <>
-              <div style={{ display: "flex", gap: 10, marginBottom: 22 }}>
+              <div style={{ marginBottom: 22 }}>
                 <button
                   onClick={() => handleGoogleLogin()}
                   disabled={loading}
-                  style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "10px 14px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.04)", color: "#e2e8f0", cursor: loading ? "not-allowed" : "pointer", fontSize: 13, fontWeight: 600, opacity: loading ? 0.4 : 1, transition: "opacity 0.2s" }}>
+                  style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "10px 14px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.04)", color: "#e2e8f0", cursor: loading ? "not-allowed" : "pointer", fontSize: 13, fontWeight: 600, opacity: loading ? 0.4 : 1, transition: "opacity 0.2s" }}>
                   <span style={{ width: 20, height: 20, borderRadius: 5, background: "#4285f4", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 900, color: "#fff" }}>G</span>
-                  Google
-                </button>
-                <button disabled title="Coming soon"
-                  style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "10px 14px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.04)", color: "#e2e8f0", cursor: "not-allowed", fontSize: 13, fontWeight: 600, opacity: 0.4 }}>
-                  <span style={{ width: 20, height: 20, borderRadius: 5, background: "#0a66c2", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 900, color: "#fff" }}>in</span>
-                  LinkedIn
+                  Continue with Google
                 </button>
               </div>
 

@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
+import { useGoogleLogin } from "@react-oauth/google";
 import { store } from "../../app/store";
 import { useAppDispatch, useAppSelector } from "../../app/hooks";
-import { login, forgotPassword } from "../../features/auth/authSlice";
+import { login, forgotPassword, googleAuth } from "../../features/auth/authSlice";
 
 const ROLE_REDIRECTS: Record<string, string> = {
   ADMIN: "/admin",
@@ -67,6 +68,28 @@ export default function LoginPage() {
       setLoading(false);
     }
   };
+
+  const handleGoogleLogin = useGoogleLogin({
+    onSuccess: async ({ access_token }) => {
+      setLoading(true);
+      setError("");
+      try {
+        await dispatch(googleAuth(access_token)).unwrap();
+        setSuccess(true);
+        setTimeout(() => {
+          const authUser = store.getState().auth.user;
+          const dest = ROLE_REDIRECTS[authUser?.role ?? ""] ?? "/";
+          navigate(dest, { replace: true });
+        }, 700);
+      } catch (err: unknown) {
+        const errAny = err as { message?: string };
+        setError(errAny?.message ?? "Google sign-in failed. Please try again.");
+      } finally {
+        setLoading(false);
+      }
+    },
+    onError: () => setError("Google sign-in was cancelled or failed."),
+  });
 
   const handleForgot = async () => {
     if (!forgotEmail.includes("@")) return setForgotError("Enter a valid email address.");
@@ -178,6 +201,21 @@ export default function LoginPage() {
                   </div>
                 ) : (
                   <>
+                    {/* Google Sign In */}
+                    <button
+                      onClick={() => handleGoogleLogin()}
+                      disabled={loading}
+                      style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 10, padding: "12px 0", borderRadius: 10, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.04)", color: "#e2e8f0", cursor: loading ? "not-allowed" : "pointer", fontSize: 14, fontWeight: 600, opacity: loading ? 0.4 : 1, transition: "opacity 0.2s", marginBottom: 16 }}>
+                      <span style={{ width: 22, height: 22, borderRadius: 5, background: "#4285f4", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 900, color: "#fff" }}>G</span>
+                      Continue with Google
+                    </button>
+
+                    <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
+                      <div style={{ flex: 1, height: 1, background: "rgba(255,255,255,0.08)" }} />
+                      <span style={{ fontSize: 11, color: "#475569", letterSpacing: 1 }}>OR</span>
+                      <div style={{ flex: 1, height: 1, background: "rgba(255,255,255,0.08)" }} />
+                    </div>
+
                     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
                       {/* Email */}
                       <div>
